@@ -78,7 +78,7 @@ class c_lexer:
         if not c:
             self.stat = 'end'
             return ('eof', None)
-        elif c.isalpha():
+        elif c.isalpha() or c == '_':
             self.buf += c
             self.stat = 'word'
         elif c.isdigit():
@@ -94,7 +94,7 @@ class c_lexer:
 
     def p_word(self):
         c = self.gc(True)
-        if c.isalpha() or c.isdigit():
+        if c.isalpha() or c.isdigit() or c == '_':
             self.buf += c
             self.gc()
         else:
