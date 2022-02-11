@@ -417,7 +417,11 @@ class c_progs:
                     r = self._run(p)
         else:
             log.append(f'prog {name}')
-            cp = prog.p.r()
+            try:
+                cp = prog.p.r()
+            except:
+                print(f'error occurred at prog {name}')
+                raise
             log.extend(cp.log)
             log.append(f'looped {cp.turns}')
             r = cp.m

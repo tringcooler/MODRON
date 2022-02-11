@@ -29,7 +29,7 @@ class c_modron_compiler:
 
     def reset(self):
         ctx = self.statctx(None, 'ready')
-        ctx['pmax'] = 0
+        ctx['pall'] = set()
         ctx['raw'] = []
         self.ctx = ctx
         return self
@@ -48,22 +48,21 @@ class c_modron_compiler:
             ctx['stat'] = d
         return ctx
 
-    def _updpmax(self, ctx, ps):
+    def _updpall(self, ctx, ps):
         if not ps:
             return
-        pmax = max(p for p, m in ps)
-        if pmax > ctx['pmax']:
-            ctx['pmax'] = pmax
+        for p, m in ps:
+            ctx['pall'].add(p)
 
     def c(self, *condis):
         ctx = self.statctx('ready', 'condi')
-        self._updpmax(ctx, condis)
+        self._updpall(ctx, condis)
         ctx['rawline/condi'] = condis
         return self.cnext(ctx)
 
     def t(self, *ops):
         ctx = self.statctx('condi', 'ready')
-        self._updpmax(ctx, ops)
+        self._updpall(ctx, ops)
         condis = ctx['rawline/condi']
         ctx['raw'].append((condis, ops))
         #del ctx['rawline/condi']
@@ -73,7 +72,8 @@ class c_modron_compiler:
     def p(self):
         ctx = self.statctx('ready', 'cmpl')
         mdr = ctx['modron']
-        mdr.pidx(ctx['pmax'])
+        for p in ctx['pall']:
+            mdr.pidx(p)
         prog = c_modron_prog()
         for condis, ops in ctx['raw']:
             cshift = 0
@@ -136,11 +136,11 @@ class c_modron:
 
     def reset(self):
         self.regs = 0
-        self.ptop = 0
+        self.pcoeff = []
 
     @property
     def pmax(self):
-        return self.prms[self.ptop]
+        return self.pcoeff[-1]
 
     def _erat2_next(self):
         d = self.psieve
@@ -160,28 +160,26 @@ class c_modron:
                     x += 2 * p
                 d[x] = p
 
-    def _updptop(self, pi):
-        dpi = self.ptop
-        if dpi >= pi:
-            return
+    def _updpcoeff(self, p):
+        if not p in self.prms:
+            return -1
+        pc = self.pcoeff
+        if p in pc:
+            return pc.index(p)
+        pc.append(p)
+        pc.sort()
+        pi = pc.index(p)
         sr = self.regs
-        self.ptop = pi
-        while dpi < pi:
-            dpi += 1
-            m = self.regs % self.prms[dpi]
-            sr -= self.mc[dpi] * m
+        dm = sr % p
+        sr -= self.mc[pi] * dm
         self.regs = sr % self.pa
+        return pi
 
     def pidx(self, p):
         pm = self.prms[-1]
         while p > pm:
             pm = self._erat2_next()
-        try:
-            pi = self.prms.index(p)
-        except ValueError:
-            return -1
-        self._updptop(pi)
-        return pi
+        return self._updpcoeff(p)
 
     def pi(self, p):
         return self.pidx(p) + 1
@@ -210,7 +208,7 @@ class c_modron:
 
     @property
     def aprms(self):
-        return self.prms[:self.ptop + 1]
+        return self.pcoeff
 
     @property
     def mcp(self):
@@ -259,9 +257,9 @@ class c_modron:
     def setreg(self, p, m):
         if m >= p or m < 0:
             raise ValueError(f'invalid value reg{p}:={m}')
+        self.pidx(p)
         sm = self.getreg(p)
         if sm == m:
-            self.pidx(p)
             return
         self.regs += self.regop(p, m - sm)
         self.regs %= self.pa
