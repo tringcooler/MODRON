@@ -42,7 +42,7 @@ class c_modron_compiler:
                 ctx[k] = v.copy()
         if s:
             ss = ctx['stat']
-            if not ss == s: #and not ss in s:
+            if not ss == s and not ss in s:
                 raise RuntimeError(f'invalid stat: {ss} -> {s}')
         if d:
             ctx['stat'] = d
@@ -94,20 +94,38 @@ class c_modron_compiler:
         return self.cnext(ctx)
 
     @property
-    def r(self):
-        ctx = self.statctx('cmpl')
+    def s(self):
+        ctx = self.statctx('cmpl exec done')
         return ctx['prog']
 
     @property
     def m(self):
-        ctx = self.statctx('cmpl')
+        ctx = self.statctx('cmpl exec done')
         return ctx['modron']
 
+    @property
+    def log(self):
+        ctx = self.statctx('exec done')
+        return self.ctx['log']
+
+    @property
+    def turns(self):
+        ctx = self.statctx('done')
+        return self.ctx['turns']
+
     def e(self):
-        ctx = self.statctx('cmpl')
+        ctx = self.statctx('cmpl', 'exec')
         mdr = ctx['modron']
         mdr.exe(ctx['prog'])
         ctx['log'].append(str(mdr))
+        return self.cnext(ctx)
+
+    def r(self, mx = 1000):
+        ctx = self.statctx('cmpl', 'done')
+        mdr = ctx['modron']
+        log = ctx['log']
+        ctx['turns'] = mdr.run(ctx['prog'], mx = mx,
+            cb = lambda c, m: log.append(str(m)))
         return self.cnext(ctx)
 
 class c_modron:
@@ -245,6 +263,21 @@ class c_modron:
 
     def exe(self, prog):
         self.regs = prog.exe(self.regs) % self.pa
+
+    def run(self, prog, mx = 1000, cb = None):
+        cnt = 0
+        wk = set()
+        while cnt < mx:
+            r = self.regs
+            if r in wk:
+                return cnt
+            else:
+                wk.add(r)
+            self.exe(prog)
+            if callable(cb):
+                cb(cnt, self)
+            cnt += 1
+        raise RuntimeError(f'run exceed max turn {mx} without loop')
 
 if __name__ == '__main__':
     

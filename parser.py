@@ -322,6 +322,8 @@ class c_progs:
     def __init__(self, cmplr):
         self.cp = cmplr
         self.progs = {}
+        self.clog = []
+        self.log = []
 
     def has(self, name):
         return name in self.progs
@@ -343,6 +345,30 @@ class c_progs:
             return False
         self.progs[name] = []
         return True
+
+    def _run(self, name):
+        if not name in self.progs:
+            raise KeyError(f'invalid prog name: {name}')
+        prog = self.progs[name]
+        log = self.clog
+        if isinstance(prog, list):
+            log.append(f'seq {name}')
+            seq = prog
+            for p in seq:
+                r = self._run(p)
+        else:
+            log.append(f'prog {name}')
+            cp = prog.p.r()
+            log.extend(cp.log)
+            log.append(f'looped {cp.turns}')
+            r = cp.m
+        return r
+
+    def run(self, name):
+        self.clog = []
+        r = self._run(name)
+        self.log.extend(self.clog)
+        return r
 
 if __name__ == '__main__':
 
