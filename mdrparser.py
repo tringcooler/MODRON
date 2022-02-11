@@ -191,6 +191,7 @@ class c_parser:
     def parse(self):
         while self.stat != 'done':
             self.p1()
+        return self.progs
 
     def p1(self):
         self.pr_all()
