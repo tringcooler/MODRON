@@ -430,6 +430,27 @@ class c_progs:
         self.log.extend(self.clog)
         return self.obuf
 
+    def showcode(self, name):
+        if not name in self.progs:
+            raise KeyError(f'invalid prog name: {name}')
+        print(f'{name}:')
+        prog = self.progs[name]
+        if isinstance(prog, list):
+            seq = prog
+            for p in seq:
+                if isinstance(p, tuple):
+                    bfunc, args = p
+                    print(f'{bfunc}(', *args, ')')
+                else:
+                    self.showcode(p)
+        else:
+            seq = prog.p.s.seq
+            for i, (cshift, condi, op) in enumerate(seq):
+                print('period', i+1)
+                print('  cshift:', cshift)
+                print('  condi:', condi)
+                print('  op:', op)
+
     def builtin_out_0(self, last):
         mdr = last
         self.obuf.append(mdr.allregs)

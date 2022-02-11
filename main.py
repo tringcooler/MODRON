@@ -33,6 +33,7 @@ if __name__ == '__main__':
         progs, mdr = parse(args.src)
         if args.c:
             print('raw prog:')
+            progs.showcode(args.e)
             return
         else:
             out = progs.run(args.e)
