@@ -23,7 +23,7 @@ if __name__ == '__main__':
                           help = 'source file')
         apsr.add_argument('-e', metavar = 'ENTRY',
                           default = 'entry',
-                          help = 'entry name')
+                          help = 'entry name, default: entry')
         apsr.add_argument('-v', action = 'store_true',
                           help = 'show detail logs')
         apsr.add_argument('-c', action = 'store_true',
