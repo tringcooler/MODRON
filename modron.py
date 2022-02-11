@@ -79,8 +79,6 @@ class c_modron_compiler:
             cshift = 0
             condi = 1
             for p, m in condis:
-                if mdr.pidx(p) < 0:
-                    raise ValueError('prm', p)
                 condi *= p
                 cshift -= mdr.regop(p, m)
             cshift %= mdr.pa
@@ -240,11 +238,22 @@ class c_modron:
     def getreg(self, p):
         return self.regs % p
 
+    @property
+    def allregs(self):
+        r = {}
+        for p in self.aprms:
+            v = self.getreg(p)
+            if v:
+                r[p] = v
+        return r
+
     def regop(self, p, m):
         m %= p
         if m == 0:
             return 0
         pidx = self.pidx(p)
+        if pidx < 0:
+            raise ValueError(f'{p} is not a prime')
         return self.mc[pidx] * m
 
     def setreg(self, p, m):

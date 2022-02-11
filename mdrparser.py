@@ -6,6 +6,8 @@ KLX_NL = '\n'
 
 KW_LBL = ':'
 KW_SPL = '/'
+KW_BR1 = '('
+KW_BR2 = ')'
 
 PRMTCH = lambda s, d: len(s) >= len(d) and s[:len(d)] == d
 
@@ -79,7 +81,7 @@ class c_lexer:
         elif c.isalpha() or c == '_':
             self.buf += c
             self.stat = 'word'
-        elif c.isdigit():
+        elif c.isdigit() or c == '-':
             self.buf += c
             self.stat = 'digit'
         elif c.isspace():
@@ -243,6 +245,8 @@ class c_parser:
             self.stgo('idle')
         elif tt == 'eof':
             self.stgo('idle')
+        elif tt == 'word' and self.chksym(KW_BR1):
+            self.stgo('func')
         elif tt == 'word':
             if not self.progs.has(tv):
                 self.rerr(f'undefined prog name: {tv}')
@@ -250,6 +254,40 @@ class c_parser:
             self.ntok()
         else:
             self.rerr(f'invalid prog name: {tv}')
+
+    def p_func(self):
+        tt, tv = self.ctok
+        if tt == 'word' and self.chksym(KW_BR1):
+            ctx = self.stctx()
+            ctx['name'] = tv
+            ctx['args'] = []
+            self.stpush()
+            self.stgo('argseq')
+            self.ntok()
+            self.ntok()
+        elif self.chksym(KW_BR2, False):
+            ctx = self.stctx()
+            func = (ctx['name'], ctx['args'])
+            if not self.progs.get_builtin(func):
+                self.rerr(f'unknown builtin func: {func[0]}({len(func[1])})')
+            self.progs.add(self.cprog, lambda s: (s.append(func), s)[1])
+            self.stgo('sequence')
+            self.ntok()
+        else:
+            self.rerr(f'invalid function: {tv}')
+
+    def p_argseq(self):
+        tt, tv = self.ctok
+        if tt == 'word' or tt == 'digit':
+            ctx = self.stctx('func')
+            ctx['args'].append(tv)
+            if self.chksym(KW_BR2):
+                self.stpop()
+            self.ntok()
+        elif self.chksym(KW_BR2, False):
+            self.stpop()
+        else:
+            self.rerr(f'invalid argument: {tv}')
 
     def p_prog(self):
         tt, tv = self.ctok
@@ -325,9 +363,20 @@ class c_progs:
         self.progs = {}
         self.clog = []
         self.log = []
+        self.obuf = []
 
     def has(self, name):
         return name in self.progs
+
+    def get_builtin(self, func_itm):
+        name, args = func_itm
+        mtd = None
+        mname = 'builtin_' + name + '_' + str(len(args))
+        if hasattr(self, mname):
+            r = getattr(self, mname)
+            if callable(r):
+                mtd = r
+        return mtd
 
     def add(self, name, cb = None):
         if not name in self.progs:
@@ -355,8 +404,17 @@ class c_progs:
         if isinstance(prog, list):
             log.append(f'seq {name}')
             seq = prog
+            r = None
             for p in seq:
-                r = self._run(p)
+                if isinstance(p, tuple):
+                    bfunc, args = p
+                    mtd = self.get_builtin(p)
+                    if not mtd:
+                        self.rerr(
+                            f'unknown builtin func: {bfunc}({len(args)})')
+                    r = mtd(r, *args)
+                else:
+                    r = self._run(p)
         else:
             log.append(f'prog {name}')
             cp = prog.p.r()
@@ -367,9 +425,20 @@ class c_progs:
 
     def run(self, name):
         self.clog = []
+        self.obuf = []
         r = self._run(name)
         self.log.extend(self.clog)
-        return r
+        return self.obuf
+
+    def builtin_out_0(self, last):
+        mdr = last
+        self.obuf.append(mdr.allregs)
+        return mdr
+
+    def builtin_out_1(self, last, p):
+        mdr = last
+        self.obuf.append(mdr.getreg(p))
+        return mdr
 
 if __name__ == '__main__':
 
