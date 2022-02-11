@@ -30,7 +30,7 @@ MODRON程序为一个3元整数组(cshift, condi, op)的序列。
 ### 基本元素
 * num 整数
 * prime 质数
-* word 可含_的由非数字开头的字符串
+* id 可含_的由非数字开头的字符串
 * newline 换行符
 * non 空
 
