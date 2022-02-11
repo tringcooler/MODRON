@@ -209,14 +209,46 @@ class c_parser:
             self.ntok()
         elif tt == 'word' and self.chksym(KW_LBL):
             self.cprog = tv
-            self.progs.add(tv)
-            self.stgo('prog')
+            self.stgo('labeled')
             self.ntok()
             self.ntok()
         elif tt == 'eof':
             self.stgo('done')
         else:
             self.rerr(f'invalid label: {tv}')
+
+    def p_labeled(self):
+        tt, tv = self.ctok
+        if tt == 'newline':
+            self.ntok()
+        elif tt == 'word' and self.chksym(KW_LBL):
+            self.stgo('idle')
+        elif tt == 'eof':
+            self.stgo('idle')
+        elif tt == 'word':
+            if not self.progs.seq(self.cprog):
+                self.rerr(f'redefined prog: {tv}')
+            self.stgo('sequence')
+        else:
+            if not self.progs.prog(self.cprog):
+                self.rerr(f'redefined prog: {tv}')
+            self.stgo('prog')
+
+    def p_sequence(self):
+        tt, tv = self.ctok
+        if tt == 'newline':
+            self.ntok()
+        elif tt == 'word' and self.chksym(KW_LBL):
+            self.stgo('idle')
+        elif tt == 'eof':
+            self.stgo('idle')
+        elif tt == 'word':
+            if not self.progs.has(tv):
+                self.rerr(f'undefined prog name: {tv}')
+            self.progs.add(self.cprog, lambda s: (s.append(tv), s)[1])
+            self.ntok()
+        else:
+            self.rerr(f'invalid prog name: {tv}')
 
     def p_prog(self):
         tt, tv = self.ctok
@@ -291,11 +323,26 @@ class c_progs:
         self.cp = cmplr
         self.progs = {}
 
+    def has(self, name):
+        return name in self.progs
+
     def add(self, name, cb = None):
         if not name in self.progs:
-            self.progs[name] = self.cp
+            raise KeyError(f'invalid prog name: {name}')
         if callable(cb):
             self.progs[name] = cb(self.progs[name])
+
+    def prog(self, name):
+        if name in self.progs:
+            return False
+        self.progs[name] = self.cp
+        return True
+
+    def seq(self, name):
+        if name in self.progs:
+            return False
+        self.progs[name] = []
+        return True
 
 if __name__ == '__main__':
 
