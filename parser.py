@@ -6,8 +6,6 @@ KLX_NL = '\n'
 
 KW_LBL = ':'
 KW_SPL = '/'
-KW_ARG = 'arg'
-KW_RET = 'ret'
 
 PRMTCH = lambda s, d: len(s) >= len(d) and s[:len(d)] == d
 
@@ -233,20 +231,14 @@ class c_parser:
 
     def p_pair(self):
         tt, tv = self.ctok
-        def rv(v):
+        if tt == 'digit':
             sctx = self.stctx()
             dctx = self.stctx(1)
             if not 'seq' in dctx:
                 dctx['seq'] = []
-            dctx['seq'].append((sctx['1st'], v))
+            dctx['seq'].append((sctx['1st'], tv))
             self.stpop()
             self.ntok()
-        if tt == 'digit':
-            rv(tv)
-        elif tt == 'word' and PRMTCH(tv, KW_ARG):
-            rv((KW_ARG, tv[:len(KW_ARG)]))
-        elif tt == 'word' and PRMTCH(tv, KW_RET) and self.stback(1) == 'opr':
-            rv((KW_RET, tv[:len(KW_RET)]))
         else:
             self.rerr(f'invalid pair: {tv}')
 
@@ -279,12 +271,6 @@ class c_parser:
             self.stpush()
             self.stgo('pair')
             self.ntok()
-            self.ntok()
-        elif tt == 'word' and tv == KW_RET:
-            ctx = self.stctx()
-            if not 'seq' in ctx:
-                ctx['seq'] = []
-            ctx['seq'].append((1, (KW_RET, None)))
             self.ntok()
         elif tt == 'newline' or tt == 'eof':
             ctx = self.stctx()
