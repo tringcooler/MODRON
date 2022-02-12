@@ -81,7 +81,7 @@ class c_modron_compiler:
             for p, m in condis:
                 condi *= p
                 cshift -= mdr.regop(p, m)
-            cshift %= mdr.pa
+            cshift %= condi
             op = 0
             for p, m in ops:
                 op += mdr.regop(p, m)
