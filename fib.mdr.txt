@@ -1,3 +1,11 @@
+# Fibonacci sequence
+# registers:
+#   503: prev number
+#   509: current number
+# temp registers:
+#   521: next number
+#     3: phase flag
+
 init:
 503:0 509:0/503:1 509:1
 
