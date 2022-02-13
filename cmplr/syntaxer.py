@@ -242,7 +242,10 @@ class prog_stmt(astnode):
         else:
             self.match('condi', pairseq, use=KS_PRS_EQ)
         self.mterm(None, val=KS_OPS)
-        self.match('op', pairseq, use=KS_PRS_PL)
+        if s.tt == 'word' or s.tt == 'digit':
+            self.match('op', pairseq, use=KS_PRS_PL)
+        else:
+            self.match('op', None)
 
 class pairseq(ulistnode):
     def parse_each(self, s, use):
