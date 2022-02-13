@@ -174,8 +174,8 @@ class astnode:
 KS_LBL = ':'
 KS_OPS = '/'
 KS_PRS_EQ = '='
-KS_PRS_GT = '>'
 KS_PRS_PL = '+'
+KS_DCL = '>'
 
 class ulistnode(astnode):
     def parse(self, s, **ka):
@@ -218,7 +218,7 @@ class sect(astnode):
             or ((s.tt == 'word' or s.tt == 'digit')
                 and s.chksym(KS_PRS_EQ, 1))):
             self.match('content', prog)
-        elif s.tt == 'word' and s.chksym(KS_PRS_GT, 1):
+        elif s.tt == 'word' and s.chksym(KS_DCL, 1):
             self.match('content', namespace)
         elif s.tt == 'word':
             self.match('content', sequence)
@@ -272,10 +272,18 @@ class namespace(mlistnode):
     def parse_each(self, s):
         if s.chksym(KS_LBL, 1):
             return True
-        elif s.tt == 'word':
-            self.match('terms', pair, True, use=KS_PRS_GT)
         else:
-            self.rerr(f'invalid declare {s.tv}')
+            self.match('terms', declare, True)
+
+class declare(astnode):
+    def parse(self, s):
+        self.mterm('name', typ='word')
+        self.mterm(None, val=KS_DCL)
+        self.match('value', calcexpr)
+
+class calcexpr(astnode):
+    def parse(self,s):
+        self.mterm('value', typ='digit', cb = lambda v: int(v))
 
 class sequence(mlistnode):
     def parse_each(self, s):
