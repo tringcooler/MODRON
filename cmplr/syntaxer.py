@@ -6,26 +6,30 @@ class err_syntax(Exception):
     def __init__(self, *na):
         super().__init__(*na)
         self.pos = None
-        self.mod = None
+        self.meta = {}
 
     def setpos(self, pos):
         if not self.pos:
             self.pos = pos
+        return self
 
-    def setmod(self, mod):
-        if not self.mod:
-            self.mod = mod
+    def set(self, k, v):
+        if not k in self.meta:
+            self.meta[k] = v
+        return self
 
     def __str__(self):
         msg = super().__str__()
         tags = []
-        if self.mod:
-            tags.append(f'm:{self.mod}')
+        if self.meta:
+            for k in self.meta:
+                v = self.meta[k]
+                tags.append(f'{k}:{v}')
         if self.pos:
             tags.append(f'ln:{self.pos[0]}')
             tags.append(f'col:{self.pos[1]}')
         if tags:
-            msg = '(' + ', '.join(tags) + ')' + msg
+            msg = '(' + ', '.join(tags) + ') ' + msg
         return msg
 
 class c_tok_stream:
@@ -83,23 +87,52 @@ class astnode:
         self.nodes = {}
         self.terms = {}
 
-    def match(self, key, ndtyp, mult = False):
-        nd = ndtyp(self.parser)
+    def rerr(self, msg):
+        raise (err_syntax(msg).set('nd', self.__class__.__name__)
+               .setpos(self.parser.stream.pos()))
+
+    def match(self, key, ndtyp, mult = False, **ka):
+        if ndtyp:
+            nd = ndtyp(self.parser)
+        else:
+            nd = None
         if key:
             if mult:
                 if not key in self.nodes:
                     self.nodes[key] = []
-                self.nodes[key].append(nd)
+                if nd:
+                    self.nodes[key].append(nd)
             else:
                 self.nodes[key] = nd
-        strm = self.parser.stream
+        if not nd:
+            return
+        s = self.parser.stream
         try:
-            nd.parse(strm)
+            nd.parse(s, **ka)
         except err_syntax as e:
-            e.setpos(self.s.pos)
+            e.setpos(s.pos())
             raise
 
-    def term(self, key, val, mult = False):
+    def mterm(self, key, mult = False, typ = 'symbol', val = None, cb = None):
+        s = self.parser.stream
+        tt, tv = s.tok()
+        if (typ and tt != typ) or (val and
+                (not tv in val if isinstance(val, list) else tv != val)):
+            self.rerr(f'unmatched term {tv}')
+        s.go()
+        if key:
+            if callable(cb):
+                val = cb(tv)
+            else:
+                val = tv
+            if mult:
+                if not key in self.terms:
+                    self.terms[key] = []
+                self.terms[key].append(val)
+            else:
+                self.terms[key] = val
+
+    def extra(self, key, val, mult = False):
         if mult:
             if not key in self.terms:
                 self.terms[key] = []
@@ -122,7 +155,9 @@ class astnode:
                 print(pad + f'{k}: {v}')
         for k in self.nodes:
             nd = self.nodes[k]
-            if isinstance(nd, list):
+            if not nd:
+                print(pad + f'{k}: None')
+            elif isinstance(nd, list):
                 print(pad + f'{k}:')
                 for snd in nd:
                     print(pad + padding * 1, end = '')
@@ -137,13 +172,17 @@ class astnode:
 #===========
 
 KS_LBL = ':'
+KS_OPS = '/'
+KS_PRS_EQ = '='
+KS_PRS_GT = '>'
+KS_PRS_PL = '+'
 
 class ulistnode(astnode):
-    def parse(self, s):
+    def parse(self, s, **ka):
         while True:
             if s.tt == 'eof':
                 break
-            elif self.parse_each(s):
+            elif self.parse_each(s, **ka):
                 break
     def parse_each(self, stream):
         raise NotImplementedError
@@ -156,37 +195,73 @@ class blankline(ulistnode):
             return True
 
 class mlistnode(astnode):
-    def parse(self, s):
+    def parse(self, s, **ka):
         while True:
-            self.match(None, blankline)
             if s.tt == 'eof':
                 break
-            elif self.parse_each(s):
+            elif self.parse_each(s, **ka):
                 break
+            self.match(None, blankline)
     def parse_each(self, stream):
         raise NotImplementedError
 
 class module(mlistnode):
     def parse_each(self, s):
+        self.match(None, blankline)
         self.match('sects', sect, True)
 
 class sect(astnode):
     def parse(self, s):
         self.match('label', label)
         self.match(None, blankline)
-        if s.tt == 'word':
+        if (s.chksym(KS_OPS)
+            or ((s.tt == 'word' or s.tt == 'digit')
+                and s.chksym(KS_PRS_EQ, 1))):
+            self.match('content', prog)
+        elif s.tt == 'word':
             self.match('content', sequence)
         else:
-            self.match('content', prog)
+            self.rerr(f'invalid sect {s.tv}')
 
 class label(astnode):
     def parse(self, s):
-        if s.tt == 'word' and s.chksym(KS_LBL, 1):
-            self.term('name', s.tv)
-            s.go()
-            s.go()
+        self.mterm('name', typ='word')
+        self.mterm(None, val=KS_LBL)
+
+class prog(mlistnode):
+    def parse_each(self, s):
+        if s.chksym(KS_LBL, 1):
+            return True
         else:
-            raise err_syntax(f'invalid label {s.tv}')
+            self.match('stmt', prog_stmt, True)
+
+class prog_stmt(astnode):
+    def parse(self, s):
+        if s.chksym(KS_OPS):
+            self.match('condi', None)
+        else:
+            self.match('condi', pairseq, use=KS_PRS_EQ)
+        self.mterm(None, val=KS_OPS)
+        self.match('op', pairseq, use=KS_PRS_PL)
+
+class pairseq(ulistnode):
+    def parse_each(self, s, use):
+        if s.tt == 'newline' or s.tt == 'symbol':
+            return True
+        self.match('terms', pair, True, use=use)
+
+class pair(astnode):
+    def parse(self, s, use):
+        if s.tt == 'word':
+            self.mterm('name', typ='word')
+            self.extra('type', 'alloc')
+        elif s.tt == 'digit':
+            self.mterm('name', typ='digit', cb = lambda v: int(v))
+            self.extra('type', 'direct')
+        else:
+            self.rerr(f'invalid pair {s.tv}')
+        self.mterm('use', val = use)
+        self.mterm('value', typ='digit', cb = lambda v: int(v))
 
 class sequence(mlistnode):
     def parse_each(self, s):
@@ -195,12 +270,11 @@ class sequence(mlistnode):
         elif s.tt == 'word':
             self.match('terms', seq_term, True)
         else:
-            raise err_syntax(f'invalid seq term {s.tv}')
+            self.rerr(f'invalid seq term {s.tv}')
 
 class seq_term(astnode):
     def parse(self, s):
-        self.term('name', s.tv)
-        s.go()
+        self.mterm('name', typ='word')
 
 #===========
 
@@ -228,7 +302,7 @@ if __name__ == '__main__':
 
     from pdb import pm
     def test1():
-        with open('../test2.mdr.txt', 'r') as fd:
+        with open('../test1.mdr.txt', 'r') as fd:
             raw = fd.read()
         psr = c_parser(raw)
         rt = psr.parse()
