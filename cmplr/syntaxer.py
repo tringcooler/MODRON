@@ -218,6 +218,8 @@ class sect(astnode):
             or ((s.tt == 'word' or s.tt == 'digit')
                 and s.chksym(KS_PRS_EQ, 1))):
             self.match('content', prog)
+        elif s.tt == 'word' and s.chksym(KS_PRS_GT, 1):
+            self.match('content', namespace)
         elif s.tt == 'word':
             self.match('content', sequence)
         else:
@@ -266,16 +268,23 @@ class pair(astnode):
         self.mterm('use', val = use)
         self.mterm('value', typ='digit', cb = lambda v: int(v))
 
-class sequence(mlistnode):
+class namespace(mlistnode):
     def parse_each(self, s):
         if s.chksym(KS_LBL, 1):
             return True
         elif s.tt == 'word':
-            self.match('terms', seq_term, True)
+            self.match('terms', pair, True, use=KS_PRS_GT)
         else:
-            self.rerr(f'invalid seq term {s.tv}')
+            self.rerr(f'invalid declare {s.tv}')
 
-class seq_term(astnode):
+class sequence(mlistnode):
+    def parse_each(self, s):
+        if s.chksym(KS_LBL, 1):
+            return True
+        else:
+            self.match('terms', sectref, True)
+
+class sectref(astnode):
     def parse(self, s):
         self.mterm('name', typ='word')
 

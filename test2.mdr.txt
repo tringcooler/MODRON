@@ -1,4 +1,0 @@
-   _p0:
-
- a  bb ccc  #ok
-ddd eee
