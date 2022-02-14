@@ -1,7 +1,7 @@
 
   dec:
 
- reg1 > 50  reg2 > 100
+ reg1 > 50 * (reg3 + 2 * -(-reg + 1))  reg2 > 100
 
    reg3 > 100
 	p_0:

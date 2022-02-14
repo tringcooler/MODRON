@@ -50,6 +50,12 @@ class c_tok_stream:
         else:
             return None
 
+    def shift(self, n, mx = 1):
+        self.la(n + mx)
+        d = c_tok_stream(self.lx, self.metainfo)
+        d.cache = self.cache[n:]
+        return d
+
     def la(self, n = 0):
         while n + 1 > len(self.cache):
             tok = next(self.strm)
@@ -300,7 +306,7 @@ class pair(astnode):
     def parse(self, s, use):
         self.match('reg', regref_wr)
         self.mterm('use', val = use)
-        self.match('value', signed_num)
+        self.match('value', signed_integer)
     def first(s, use):
         return regref_wr.first(s) and s.chksyms(use, 1)
 
@@ -309,13 +315,13 @@ class regref_wr(astnode):
         if s.tt == 'word':
             self.mterm('name', typ='word')
             self.extra('type', 'alloc')
-        elif s.tt == 'digit':
-            self.mterm('name', typ='digit', cb = lambda v: int(v))
+        elif self.prec(integer):
+            self.match('name', integer)
             self.extra('type', 'direct')
         else:
             self.rerr(f'invalid regref {s.tv}')
     def first(s):
-        return s.tt == 'word' or s.tt == 'digit'
+        return s.tt == 'word' or integer.first(s)
 
 class regref_rd(astnode):
     def parse(self,s):
@@ -323,7 +329,13 @@ class regref_rd(astnode):
     def first(s):
         return s.tt == 'word'
 
-class signed_num(astnode):
+class integer(astnode):
+    def parse(self, s):
+        self.mterm('value', typ='digit', cb = lambda v: int(v))
+    def first(s):
+        return s.tt == 'digit'
+
+class signed_integer(astnode):
     def parse(self, s):
         sign = 1
         if s.chksym(KS_NEG):
@@ -349,7 +361,7 @@ class declare(astnode):
     def parse(self, s):
         self.mterm('name', typ='word')
         self.mterm(None, val=KS_DCL)
-        self.match('value', signed_num)
+        self.match('value', calcexpr)
     def first(s):
         return s.tt == 'word' and s.chksym(KS_DCL, 1)
 
@@ -373,14 +385,11 @@ class calcexpr(astnode):
 
 class cexp_lv1(astnode):
     def parse(self, s):
-        if self.prec(cexp_lvlst):
-            self.match('term', cexp_lvlst)
-        else:
-            self.rerr(f'invalid expr lv1 term {s.tv}')
+        self.match('term', cexp_lv2)
         if self.prec(cexp_lv1_tail):
             self.match('tail', cexp_lv1_tail)
     def first(s):
-        return cexp_lvlst.first(s)
+        return cexp_lv2.first(s)
 
 class cexp_lv1_tail(astnode):
     OPSYM = [KS_EXP_ADD, KS_EXP_SUB]
@@ -390,30 +399,47 @@ class cexp_lv1_tail(astnode):
     def first(s):
         return s.chksyms(cexp_lv1_tail.OPSYM)
 
-class cexp_lvlst(astnode):
+class cexp_lv2(astnode):
+    def parse(self, s):
+        self.match('term', cexp_uop_term)
+        if self.prec(cexp_lv2_tail):
+            self.match('tail', cexp_lv2_tail)
+    def first(s):
+        return cexp_uop_term.first(s)
+
+class cexp_lv2_tail(astnode):
+    OPSYM = [KS_EXP_MUL, KS_EXP_DIV]
+    def parse(self, s):
+        self.mterm('op')
+        self.match('term', cexp_lv2)
+    def first(s):
+        return s.chksyms(cexp_lv2_tail.OPSYM)
+
+class cexp_uop_term(astnode):
+    OPSYM = [KS_NEG]
+    def parse(self, s):
+        if s.chksyms(cexp_uop_term.OPSYM):
+            self.mterm('op')
+        self.match('term', cexp_term)
+    def first(s):
+        return cexp_term.first(s) or (
+            s.chksyms(cexp_uop_term.OPSYM)
+            and cexp_term.first(s.shift(1)))
+
+class cexp_term(astnode):
     def parse(self, s):
         if self.prec(cexp_br):
             self.match('term', cexp_br)
         elif self.prec(regref_rd):
             self.match('term', regref_rd)
-        elif self.prec(signed_num):
-            self.match('term', signed_num)
+        elif self.prec(integer):
+            self.match('term', integer)
         else:
-            self.rerr(f'invalid expr lv last term {s.tv}')
-        if self.prec(cexp_lvlst_tail):
-            self.match('tail', cexp_lvlst_tail)
+            self.rerr(f'invalid expr term {s.tv}')
     def first(s):
         return (cexp_br.first(s)
             or regref_rd.first(s)
-            or signed_num.first(s))
-
-class cexp_lvlst_tail(astnode):
-    OPSYM = [KS_EXP_MUL, KS_EXP_DIV]
-    def parse(self, s):
-        self.mterm('op')
-        self.match('term', cexp_lvlst)
-    def first(s):
-        return s.chksyms(cexp_lvlst_tail.OPSYM)
+            or integer.first(s))
 
 class cexp_br(astnode):
     def parse(self, s):
@@ -456,10 +482,10 @@ if __name__ == '__main__':
         return psr, rt
     def test2():
         psr = c_parser(
-            'r1 + 2 * -3 / ((5 + r2) * - 32)')
+            'r1 + 2 * -3 / (-(5 + -r2) * - 32)')
         psr.reset()
         rt = calcexpr(psr)
         rt.parse(psr.stream)
         return psr, rt
-    psr, rt = test2()
+    psr, rt = test1()
 
