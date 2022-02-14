@@ -377,19 +377,16 @@ class cexp_lv1(astnode):
             self.match('term', cexp_lvlst)
         else:
             self.rerr(f'invalid expr lv1 term {s.tv}')
-        self.match('tail', cexp_lv1_tail)
+        if self.prec(cexp_lv1_tail):
+            self.match('tail', cexp_lv1_tail)
     def first(s):
         return cexp_lvlst.first(s)
 
 class cexp_lv1_tail(astnode):
     OPSYM = [KS_EXP_ADD, KS_EXP_SUB]
     def parse(self, s):
-        if self.prec(cexp_lv1_tail):
-            self.extra('empty', False)
-            self.mterm('op')
-            self.match('term', cexp_lv1)
-        else:
-            self.extra('empty', True)
+        self.mterm('op')
+        self.match('term', cexp_lv1)
     def first(s):
         return s.chksyms(cexp_lv1_tail.OPSYM)
 
@@ -403,7 +400,8 @@ class cexp_lvlst(astnode):
             self.match('term', signed_num)
         else:
             self.rerr(f'invalid expr lv last term {s.tv}')
-        self.match('tail', cexp_lvlst_tail)
+        if self.prec(cexp_lvlst_tail):
+            self.match('tail', cexp_lvlst_tail)
     def first(s):
         return (cexp_br.first(s)
             or regref_rd.first(s)
@@ -412,12 +410,8 @@ class cexp_lvlst(astnode):
 class cexp_lvlst_tail(astnode):
     OPSYM = [KS_EXP_MUL, KS_EXP_DIV]
     def parse(self, s):
-        if self.prec(cexp_lvlst_tail):
-            self.extra('empty', False)
-            self.mterm('op')
-            self.match('term', cexp_lvlst)
-        else:
-            self.extra('empty', True)
+        self.mterm('op')
+        self.match('term', cexp_lvlst)
     def first(s):
         return s.chksyms(cexp_lvlst_tail.OPSYM)
 
@@ -462,7 +456,7 @@ if __name__ == '__main__':
         return psr, rt
     def test2():
         psr = c_parser(
-            'r1 + 2 * -3 / (5 + r2) * - 32')
+            'r1 + 2 * -3 / ((5 + r2) * - 32)')
         psr.reset()
         rt = calcexpr(psr)
         rt.parse(psr.stream)
