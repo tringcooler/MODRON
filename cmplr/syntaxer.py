@@ -361,6 +361,34 @@ class sectref(astnode):
 
 class calcexpr(astnode):
     def parse(self, s):
+        self.match(cexp_lv1)
+    def first(s):
+        return cexp_lv1.first(s)
+
+class cexp_lv1(astnode):
+    def parse(self, s):
+        if self.prec(cexp_lv2):
+            self.match('term', cexp_lv2)
+        else:
+            self.rerr(f'invalid expr lv1 term {s.tv}')
+        self.match('tail', cexp_lv1_tail)
+    def first(s):
+        return cexp_lv2.first(s)
+
+class cexp_lv1_tail(astnode):
+    OPSYM = [KS_EXP_ADD, KS_EXP_SUB]
+    def parse(self, s):
+        if self.prec(cexp_lv1_tail):
+            self.extra('empty', False)
+            self.mterm('op')
+            self.match('term', cexp_lv1_tail)
+        else:
+            self.extra('empty', True)
+    def first(s):
+        return s.chksyms(cexp_tail.OPSYM)
+
+class cexp_lst(astnode):
+    def parse(self, s):
         if self.prec(cexp_br):
             self.match('head', cexp_br)
         elif self.prec(regref_rd):
@@ -370,6 +398,17 @@ class calcexpr(astnode):
         else:
             self.rerr(f'invalid expr term {s.tv}')
         self.match('tail', cexp_tail)
+    def first(s):
+        return (cexp_br.first(s)
+            or regref_rd.first(s)
+            or signed_num.first(s))
+
+class cexp_tail(astnode):
+    OPSYM = [KS_EXP_ADD, KS_EXP_ADD, KS_EXP_ADD, KS_EXP_ADD]
+    def parse(self, s):
+        self.mterm('op', val=cexp_tail.OPSYM)
+    def first(s):
+        return s.chksyms(cexp_tail.OPSYM)
 
 class regref_rd(astnode):
     def parse(self,s):
@@ -408,5 +447,10 @@ if __name__ == '__main__':
         psr = c_parser(raw)
         rt = psr.parse()
         return psr, rt
+    def test2():
+        psr = c_parser(
+            'r1 + 2 * -3 / (5 + r2) * - 32')
+        rt = psr.parse()
+        return psr, rt
     psr, rt = test1()
-        
+
