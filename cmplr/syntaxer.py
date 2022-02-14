@@ -77,6 +77,15 @@ class c_tok_stream:
         tt, tv = self.tok(n)
         return tt == 'symbol' and tv == v
 
+    def chksyms(self, vs, n = 0):
+        if not isinstance(vs, list):
+            vs = [vs]
+        for v in vs:
+            tt, tv = self.tok(n)
+            if tt == 'symbol' and tv == v:
+                return True
+        return False
+
     def go(self):
         self.cache.pop(0)
 
@@ -143,6 +152,20 @@ class astnode:
     def parse(self, stream):
         raise NotImplementedError
 
+    def prec(self, ndtyp, **ka):
+        s = self.parser.stream
+        return ndtyp.first(s, **ka)
+
+    def first(stream):
+        raise NotImplementedError
+
+    def prec_end(self, **ka):
+        s = self.parser.stream
+        return type(self).follow(s, **ka)
+
+    def follow(s):
+        return s.tt == 'eof'
+
     def show(self, lv=0, padding = '  '):
         print(self.__class__.__name__)
         pad = padding * (lv + 1)
@@ -173,37 +196,42 @@ class astnode:
 
 KS_LBL = ':'
 KS_OPS = '/'
+KS_NEG = '-'
 KS_PRS_EQ = '='
 KS_PRS_PL = '+'
 KS_DCL = '>'
+KS_EXP_BR1 = '('
+KS_EXP_BR2 = ')'
+KS_EXP_ADD = '+'
+KS_EXP_SUB = '-'
+KS_EXP_MUL = '*'
+KS_EXP_DIV = '/'
 
-class ulistnode(astnode):
+class listnode(astnode):
     def parse(self, s, **ka):
         while True:
-            if s.tt == 'eof':
+            if self.prec_end():
                 break
-            elif self.parse_each(s, **ka):
-                break
+            self.parse_each(s, **ka)
+            self.post_parse(s)
+    def post_parse(self, stream):
+        pass
     def parse_each(self, stream):
         raise NotImplementedError
 
-class blankline(ulistnode):
+class ulistnode(listnode):
+    def follow(s):
+        return super(__class__, __class__).follow(s) or s.tt == 'newline'
+
+class blankline(listnode):
     def parse_each(self, s):
-        if s.tt == 'newline':
-            s.go()
-        else:
-            return True
+        self.mterm(None, typ = 'newline')
+    def follow(s):
+        return super(__class__, __class__).follow(s) or s.tt != 'newline'
 
-class mlistnode(astnode):
-    def parse(self, s, **ka):
-        while True:
-            if s.tt == 'eof':
-                break
-            elif self.parse_each(s, **ka):
-                break
-            self.match(None, blankline)
-    def parse_each(self, stream):
-        raise NotImplementedError
+class mlistnode(listnode):
+    def post_parse(self, s):
+        self.match(None, blankline)
 
 class module(mlistnode):
     def parse_each(self, s):
@@ -214,13 +242,11 @@ class sect(astnode):
     def parse(self, s):
         self.match('label', label)
         self.match(None, blankline)
-        if (s.chksym(KS_OPS)
-            or ((s.tt == 'word' or s.tt == 'digit')
-                and s.chksym(KS_PRS_EQ, 1))):
+        if self.prec(prog):
             self.match('content', prog)
-        elif s.tt == 'word' and s.chksym(KS_DCL, 1):
+        elif self.prec(namespace):
             self.match('content', namespace)
-        elif s.tt == 'word':
+        elif self.prec(sequence):
             self.match('content', sequence)
         else:
             self.rerr(f'invalid sect {s.tv}')
@@ -229,34 +255,57 @@ class label(astnode):
     def parse(self, s):
         self.mterm('name', typ='word')
         self.mterm(None, val=KS_LBL)
+    def first(s):
+        return s.tt == 'word' and s.chksym(KS_LBL, 1)
 
-class prog(mlistnode):
+class sect_content(mlistnode):
+    def follow(s):
+        return super(__class__, __class__).follow(s) or label.first(s)
+
+class prog(sect_content):
     def parse_each(self, s):
-        if s.chksym(KS_LBL, 1):
-            return True
-        else:
-            self.match('stmt', prog_stmt, True)
+        self.match('stmt', prog_stmt, True)
+    def first(s):
+        return prog_stmt.first(s)
 
 class prog_stmt(astnode):
     def parse(self, s):
         if s.chksym(KS_OPS):
             self.match('condi', None)
-        else:
+        elif self.prec(pairseq, use=KS_PRS_EQ):
             self.match('condi', pairseq, use=KS_PRS_EQ)
-        self.mterm(None, val=KS_OPS)
-        if s.tt == 'word' or s.tt == 'digit':
-            self.match('op', pairseq, use=KS_PRS_PL)
         else:
+            self.rerr(f'invalid condi {s.tv}')
+        self.mterm(None, val=KS_OPS)
+        if self.prec(pairseq, use=[KS_PRS_EQ, KS_PRS_PL]):
+            self.match('op', pairseq, use=[KS_PRS_EQ, KS_PRS_PL])
+        elif self.prec_end():
             self.match('op', None)
+        else:
+            self.rerr(f'invalid op {s.tv}')
+    def first(s):
+        return s.chksym(KS_OPS) or pairseq.first(s, use=KS_PRS_EQ)
+    def follow(s):
+        return super(__class__, __class__).follow(s) or s.tt == 'newline'
 
 class pairseq(ulistnode):
     def parse_each(self, s, use):
-        if s.tt == 'newline' or s.tt == 'symbol':
-            return True
         self.match('terms', pair, True, use=use)
+    def follow(s):
+        return super(__class__, __class__).follow(s) or s.tt == 'symbol'
+    def first(s, use):
+        return pair.first(s, use=use)
 
 class pair(astnode):
     def parse(self, s, use):
+        self.match('reg', regref_wr)
+        self.mterm('use', val = use)
+        self.match('value', signed_num)
+    def first(s, use):
+        return regref_wr.first(s) and s.chksyms(use, 1)
+
+class regref_wr(astnode):
+    def parse(self, s):
         if s.tt == 'word':
             self.mterm('name', typ='word')
             self.extra('type', 'alloc')
@@ -264,37 +313,69 @@ class pair(astnode):
             self.mterm('name', typ='digit', cb = lambda v: int(v))
             self.extra('type', 'direct')
         else:
-            self.rerr(f'invalid pair {s.tv}')
-        self.mterm('use', val = use)
-        self.mterm('value', typ='digit', cb = lambda v: int(v))
+            self.rerr(f'invalid regref {s.tv}')
+    def first(s):
+        return s.tt == 'word' or s.tt == 'digit'
 
-class namespace(mlistnode):
-    def parse_each(self, s):
-        if s.chksym(KS_LBL, 1):
+class signed_num(astnode):
+    def parse(self, s):
+        sign = 1
+        if s.chksym(KS_NEG):
+            self.mterm(None, val = KS_NEG)
+            sign = -1
+        self.mterm('value', typ='digit', cb = lambda v: sign * int(v))
+    def first(s):
+        tt, tv = s.tok(n)
+        if tt == 'digit':
             return True
+        elif tt == KS_NEG:
+            return s.tok(n+1)[0] == 'digit'
         else:
-            self.match('terms', declare, True)
+            return False
+
+class namespace(sect_content):
+    def parse_each(self, s):
+        self.match('terms', declare, True)
+    def first(s):
+        return declare.first(s)
 
 class declare(astnode):
     def parse(self, s):
         self.mterm('name', typ='word')
         self.mterm(None, val=KS_DCL)
-        self.match('value', calcexpr)
+        self.match('value', signed_num)
+    def first(s):
+        return s.tt == 'word' and s.chksym(KS_DCL, 1)
 
-class calcexpr(astnode):
-    def parse(self,s):
-        self.mterm('value', typ='digit', cb = lambda v: int(v))
-
-class sequence(mlistnode):
+class sequence(sect_content):
     def parse_each(self, s):
-        if s.chksym(KS_LBL, 1):
-            return True
-        else:
-            self.match('terms', sectref, True)
+        self.match('terms', sectref, True)
+    def first(s):
+        return sectref.first(s)
 
 class sectref(astnode):
     def parse(self, s):
         self.mterm('name', typ='word')
+    def first(s):
+        return s.tt == 'word'
+
+class calcexpr(astnode):
+    def parse(self, s):
+        if self.prec(cexp_br):
+            self.match('head', cexp_br)
+        elif self.prec(regref_rd):
+            self.match('head', regref_rd)
+        elif self.prec(signed_num):
+            self.match('head', signed_num)
+        else:
+            self.rerr(f'invalid expr term {s.tv}')
+        self.match('tail', cexp_tail)
+
+class regref_rd(astnode):
+    def parse(self,s):
+        self.mterm('value', typ='word')
+    def first(s):
+        return s.tt == 'word'
 
 #===========
 

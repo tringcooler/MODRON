@@ -73,7 +73,7 @@ class c_lexer:
         elif c.isalpha() or c == '_':
             self.buf += c
             self.stat = 'word'
-        elif c.isdigit() or c == '-':
+        elif c.isdigit():
             self.buf += c
             self.stat = 'digit'
         elif c.isspace():
