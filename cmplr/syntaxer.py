@@ -240,9 +240,16 @@ class mlistnode(listnode):
         self.match(None, blankline)
 
 class module(mlistnode):
-    def parse_each(self, s):
+    def parse(self, s):
         self.match(None, blankline)
-        self.match('sects', sect, True)
+        self.match('sects', sects)
+        self.mterm(None, typ = 'eof')
+
+class sects(mlistnode):
+    def parse_each(self, s):
+        self.match('terms', sect, True)
+    def first(s):
+        return sect.first(s)
 
 class sect(astnode):
     def parse(self, s):
@@ -256,6 +263,8 @@ class sect(astnode):
             self.match('content', sequence)
         else:
             self.rerr(f'invalid sect {s.tv}')
+    def first(s):
+        return label.first(s)
 
 class label(astnode):
     def parse(self, s):
