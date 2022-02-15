@@ -50,11 +50,8 @@ class c_tok_stream:
         else:
             return None
 
-    def shift(self, n, mx = 1):
-        self.la(n + mx)
-        d = c_tok_stream(self.lx, self.metainfo)
-        d.cache = self.cache[n:]
-        return d
+    def shift(self, n):
+        return c_tok_stream_shift(self, n)
 
     def la(self, n = 0):
         while n + 1 > len(self.cache):
@@ -94,6 +91,25 @@ class c_tok_stream:
 
     def go(self):
         self.cache.pop(0)
+
+class c_tok_stream_shift(c_tok_stream):
+
+    def __init__(self, src, offset):
+        super().__init__(src.lx, src.metainfo)
+        self.src = src
+        self.offset = offset
+
+    def reset(self):
+        pass
+
+    def shift(self, n):
+        return self.src.shift(self.offset + n)
+
+    def la(self, n = 0):
+        return self.src.la(self.offset + n)
+
+    def go(self):
+        self.src.go()
 
 class astnode:
 
