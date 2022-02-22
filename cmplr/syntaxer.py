@@ -296,7 +296,7 @@ class c_parser:
 
     def parse(self):
         self.reset()
-        rseq = self.rootnd.match(self.stream, [])
+        rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')])
         return rseq[0]
 
 if __name__ == '__main__':
