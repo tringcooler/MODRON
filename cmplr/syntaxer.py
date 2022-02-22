@@ -115,34 +115,17 @@ class c_nddesc:
 
     def __init__(self, *seq):
         self.seq = seq
-        self.key = None
 
     def match(self, strm, flw):
         raise NotImplementedError
 
-class c_ndd_pair(c_nddesc):
-
-    def __init__(self, key, ndd):
-        super.__init__([ndd])
-        self.key = key
+class c_ndresult:
+    
+    def __init__(self, meta, *seq):
+        self.meta = meta
+        self.seq = seq
 
 class c_ndd_seq(c_nddesc):
-
-    def first(self, strm, num, flw):
-        remain_num = 0
-        cur_num = num
-        cur_follow = self.seq.copy()
-        shft = 0
-        while len(cur_follow) > 0:
-            ndd = cur_follow.pop(0)
-            remain_num = d.first(strm.shift(shft), cur_num)
-            if remain_num <= 0:
-                break
-            shft = num - remain_num
-            cur_num = remain_num
-        else:
-            pass
-        return remain_num
 
     def match(self, strm, flw):
         cur_seq = [*self.seq[1:], *flw]
@@ -151,12 +134,10 @@ class c_ndd_seq(c_nddesc):
         if not rseq:
             return rseq
         slen = len(self.seq)
-        return [rseq[:slen], *rseq[slen:]]
+        return [c_ndresult(
+            {'typ': 'seq'}, *rseq[:slen]), *rseq[slen:]]
 
 class c_ndd_or(c_nddesc):
-
-    def first(self, s, n):
-        pass
 
     def match(self, strm, flw):
         for ndd in self.seq:
@@ -165,6 +146,16 @@ class c_ndd_or(c_nddesc):
                 return rseq
         else:
             return None
+
+class c_ndd_pair(c_nddesc):
+
+    def match(self, strm, flw):
+        key, ndd = self.seq
+        rseq = ndd.match(strm, flw)
+        if not rseq:
+            return rseq
+        return [c_ndresult(
+            {'typ': 'pair', 'key': key}, rseq[0]), *rseq[1:]]
             
 class c_ndd_term(c_nddesc):
 
@@ -178,11 +169,11 @@ class c_ndd_term(c_nddesc):
 
     def match(self, strm, flw):
         term_typ, term_val = self._parseseq()
-        tt, tv = s.tok()
+        tt, tv = strm.tok()
         if term_typ != tt or (
             term_val and term_val != tv):
             return None
-        r = (tt, tv)
+        r = c_ndresult({'typ': 'term'}, tt, tv)
         if flw:
             flndd = flw[0]
             flseq = flw[1:]
@@ -190,7 +181,101 @@ class c_ndd_term(c_nddesc):
             return [r, *flrseq]
         else:
             return [r]
-        
+
+class astnode:
+
+    DESC = None
+
+    def __init__(self):
+        self.nodes = {}
+
+    @classmethod
+    def _parsendr(cls, node, ndr):
+        if not isinstance(ndr, c_ndresult):
+            return ndr
+        ntyp = ndr.meta['typ']
+        if ntyp == 'seq':
+            vs = []
+            for r in ndr.seq:
+                v = cls._parsendr(node, r)
+                if isinstance(v, list):
+                    vs.extend(v)
+                else:
+                    vs.append(v)
+            return vs
+        elif ntyp == 'pair':
+            k = ndr.meta['key']
+            v = cls._parsendr(node, ndr.seq[0])
+            assert v
+            node.nodes[k] = v
+            return v
+        elif ntyp == 'term':
+            return ndr.seq[1]
+        else:
+            raise NotImplemented
+
+    @classmethod
+    def match(cls, strm, flw):
+        ndd = cls.DESC
+        rseq = ndd.match(strm, flw)
+        if not rseq:
+            raise (err_syntax(msg).set('nd', cls.__name__)
+                .setpos(strm.pos()))
+        ndr = rseq[0]
+        node = cls()
+        cls._parsendr(node, ndr)
+        return [node, *rseq[1:]]
+
+    def show(self, lv=0, padding = '  '):
+        print(self.__class__.__name__)
+        pad = padding * (lv + 1)
+        for k in self.nodes:
+            nd = self.nodes[k]
+            if not nd:
+                print(pad + f'{k}: None')
+            elif isinstance(nd, list):
+                print(pad + f'{k}:')
+                for snd in nd:
+                    print(pad + padding * 1, end = '')
+                    if isinstance(snd, astnode):
+                        snd.show(lv + 2, padding)
+                    else:
+                        print(snd)
+            elif isinstance(nd, astnode):
+                print(pad + f'{k}: ', end = '')
+                nd.show(lv + 1, padding)
+            else:
+                print(pad + f'{k}: {nd}')
+
+def ndd(cb_desc):
+    return cb_desc(c_ndd_seq, c_ndd_or, c_ndd_pair, c_ndd_term)
+
+class texplv2(astnode):
+    DESC = ndd(lambda s,o,k,t: s(
+        k('v1', t(None, 'digit')),
+        k('op', o(t('*'), t('/'))),
+        k('v2', t(None, 'digit')) ))
+
+class texplv1(astnode):
+    DESC = ndd(lambda s,o,k,t: s(
+        k('v1', texplv2),
+        k('op', o(t('+'), t('-'))),
+        k('v2', texplv2) ))
+
+from lexer import c_lexer
+def test1():
+    raw = '1 * 2 + 3 / 4'
+    strm = c_tok_stream(c_lexer(raw))
+    return texplv1.match(strm, [])
+
+foo = test1()[0]
+
+import sys
+sys.exit()
+
+#
+#
+#
 
 class astnode:
 
