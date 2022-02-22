@@ -147,6 +147,22 @@ class c_ndd_or(c_nddesc):
         else:
             return None
 
+class c_ndd_maybe(c_nddesc):
+
+    def match(self, strm, flw):
+        ndd = self.seq[0]
+        rseq = ndd.match(strm, flw)
+        if rseq:
+            return rseq
+        r = c_ndresult({'typ': 'empty'})
+        if flw:
+            flndd = flw[0]
+            flseq = flw[1:]
+            flrseq = flndd.match(strm.shift(1), flseq)
+            return [r, *flrseq]
+        else:
+            return [r]
+
 class c_ndd_pair(c_nddesc):
 
     def match(self, strm, flw):
@@ -188,6 +204,12 @@ class astnode:
 
     def __init__(self):
         self.nodes = {}
+        self.isempty = False
+
+    @classmethod
+    def nddesc(cls):
+        return cls.DESC(
+            c_ndd_seq, c_ndd_or, c_ndd_maybe, c_ndd_pair, c_ndd_term)
 
     @classmethod
     def _parsendr(cls, node, ndr):
@@ -198,7 +220,9 @@ class astnode:
             vs = []
             for r in ndr.seq:
                 v = cls._parsendr(node, r)
-                if isinstance(v, list):
+                if v is None:
+                    continue
+                elif isinstance(v, list):
                     vs.extend(v)
                 else:
                     vs.append(v)
@@ -206,27 +230,33 @@ class astnode:
         elif ntyp == 'pair':
             k = ndr.meta['key']
             v = cls._parsendr(node, ndr.seq[0])
-            assert v
             node.nodes[k] = v
             return v
         elif ntyp == 'term':
             return ndr.seq[1]
+        elif ntyp == 'empty':
+            return None
         else:
             raise NotImplemented
 
     @classmethod
     def match(cls, strm, flw):
-        ndd = cls.DESC
+        ndd = cls.nddesc()
         rseq = ndd.match(strm, flw)
         if not rseq:
             raise (err_syntax(msg).set('nd', cls.__name__)
                 .setpos(strm.pos()))
         ndr = rseq[0]
         node = cls()
-        cls._parsendr(node, ndr)
+        v = cls._parsendr(node, ndr)
+        if not v:
+            node.isempty = True
         return [node, *rseq[1:]]
 
     def show(self, lv=0, padding = '  '):
+        if self.isempty:
+            print('empty')
+            return
         print(self.__class__.__name__)
         pad = padding * (lv + 1)
         for k in self.nodes:
@@ -247,24 +277,26 @@ class astnode:
             else:
                 print(pad + f'{k}: {nd}')
 
-def ndd(cb_desc):
-    return cb_desc(c_ndd_seq, c_ndd_or, c_ndd_pair, c_ndd_term)
-
 class texplv2(astnode):
-    DESC = ndd(lambda s,o,k,t: s(
+    DESC = lambda s,o,m,k,t: s(
         k('v1', t(None, 'digit')),
         k('op', o(t('*'), t('/'))),
-        k('v2', t(None, 'digit')) ))
+        k('v2', t(None, 'digit')) )
+
+class texplv1_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('op', o(t('+'), t('-'))),
+        k('v2', texplv2),
+        k('nxt', texplv1_tail) ))
 
 class texplv1(astnode):
-    DESC = ndd(lambda s,o,k,t: s(
+    DESC = lambda s,o,m,k,t: s(
         k('v1', texplv2),
-        k('op', o(t('+'), t('-'))),
-        k('v2', texplv2) ))
+        k('tl', texplv1_tail) )
 
 from lexer import c_lexer
 def test1():
-    raw = '1 * 2 + 3 / 4'
+    raw = '1 * 2 + 3 / 4 + 2 * 1'
     strm = c_tok_stream(c_lexer(raw))
     return texplv1.match(strm, [])
 
