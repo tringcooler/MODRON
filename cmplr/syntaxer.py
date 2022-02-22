@@ -277,30 +277,53 @@ class astnode:
             else:
                 print(pad + f'{k}: {nd}')
 
-class texplv2(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('v1', t(None, 'digit')),
-        k('op', o(t('*'), t('/'))),
-        k('v2', t(None, 'digit')) )
-
-class texplv1_tail(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
-        k('op', o(t('+'), t('-'))),
-        k('v2', texplv2),
-        k('nxt', texplv1_tail) ))
-
-class texplv1(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('v1', texplv2),
-        k('tl', texplv1_tail) )
+#===========
 
 from lexer import c_lexer
-def test1():
-    raw = '1 * 2 + 3 / 4 + 2 * 1'
-    strm = c_tok_stream(c_lexer(raw))
-    return texplv1.match(strm, [])
 
-foo = test1()[0]
+class c_parser:
+
+    def __init__(self, rootnd, raw, metainfo = None):
+        self.raw = raw
+        self.rootnd = rootnd
+        self.metainfo = metainfo
+
+    def new_stream(self, raw, mi):
+        return c_tok_stream(c_lexer(raw), mi)
+
+    def reset(self):
+        self.stream = self.new_stream(self.raw, self.metainfo)
+
+    def parse(self):
+        self.reset()
+        rseq = self.rootnd.match(self.stream, [])
+        return rseq[0]
+
+if __name__ == '__main__':
+
+    class texplv2(astnode):
+        DESC = lambda s,o,m,k,t: s(
+            k('v1', t(None, 'digit')),
+            k('op', o(t('*'), t('/'))),
+            k('v2', t(None, 'digit')) )
+
+    class texplv1_tail(astnode):
+        DESC = lambda s,o,m,k,t: m(s(
+            k('op', o(t('+'), t('-'))),
+            k('v2', texplv2),
+            k('nxt', texplv1_tail) ))
+
+    class texplv1(astnode):
+        DESC = lambda s,o,m,k,t: s(
+            k('v1', texplv2),
+            k('tl', texplv1_tail) )
+
+    def test1():
+        raw = '1 * 2 + 3 / 4 + 2 * 1'
+        psr = c_parser(texplv1, raw)
+        return psr.parse()
+
+    foo = test1()
 
 import sys
 sys.exit()
