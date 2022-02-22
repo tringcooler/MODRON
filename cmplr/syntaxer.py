@@ -111,6 +111,87 @@ class c_tok_stream_shift(c_tok_stream):
     def go(self):
         self.src.go()
 
+class c_nddesc:
+
+    def __init__(self, *seq):
+        self.seq = seq
+        self.key = None
+
+    def match(self, strm, flw):
+        raise NotImplementedError
+
+class c_ndd_pair(c_nddesc):
+
+    def __init__(self, key, ndd):
+        super.__init__([ndd])
+        self.key = key
+
+class c_ndd_seq(c_nddesc):
+
+    def first(self, strm, num, flw):
+        remain_num = 0
+        cur_num = num
+        cur_follow = self.seq.copy()
+        shft = 0
+        while len(cur_follow) > 0:
+            ndd = cur_follow.pop(0)
+            remain_num = d.first(strm.shift(shft), cur_num)
+            if remain_num <= 0:
+                break
+            shft = num - remain_num
+            cur_num = remain_num
+        else:
+            pass
+        return remain_num
+
+    def match(self, strm, flw):
+        cur_seq = [*self.seq[1:], *flw]
+        ndd = self.seq[0]
+        rseq = ndd.match(strm, cur_seq)
+        if not rseq:
+            return rseq
+        slen = len(self.seq)
+        return [rseq[:slen], *rseq[slen:]]
+
+class c_ndd_or(c_nddesc):
+
+    def first(self, s, n):
+        pass
+
+    def match(self, strm, flw):
+        for ndd in self.seq:
+            rseq = ndd.match(strm, flw)
+            if rseq:
+                return rseq
+        else:
+            return None
+            
+class c_ndd_term(c_nddesc):
+
+    def _parseseq(self):
+        seq = self.seq
+        if len(seq) > 1:
+            term_typ = seq[1]
+        else:
+            term_typ = 'symbol'
+        return term_typ, seq[0]
+
+    def match(self, strm, flw):
+        term_typ, term_val = self._parseseq()
+        tt, tv = s.tok()
+        if term_typ != tt or (
+            term_val and term_val != tv):
+            return None
+        r = (tt, tv)
+        if flw:
+            flndd = flw[0]
+            flseq = flw[1:]
+            flrseq = flndd.match(strm.shift(1), flseq)
+            return [r, *flrseq]
+        else:
+            return [r]
+        
+
 class astnode:
 
     def __init__(self, parser):
