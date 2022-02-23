@@ -68,21 +68,16 @@ class prog_lv1_seq(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('term', prog_lv1_or_seq),
         blankline,
-        k('...', m(prog_lv1_seq)),
+        k('...', prog_lv1_seq_tail),
     )
 
 class prog_lv1_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
-        k('term', o(
-            s(
-                t(KS_PRG_MRG), o(
-                    prog_lv1_seq, prog_lv2
-                ),
-            ),
-            prog_lv1_seq,
-        )),
+        k('merge', m(t(KS_PRG_MRG))),
         blankline,
-        k('...', prog_lv1_seq_tail),
+        k('term', prog_lv1_or_seq),
+        blankline,
+        k('...', m(prog_lv1_seq_tail)),
     ))
 
 class prog_lv1_or_seq(astnode):
@@ -106,20 +101,8 @@ class prog_lv2_seq(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('term', prog_lv2),
         blankline,
-        k('...', prog_lv2_seq_tail),
+        k('...', m(prog_lv2_seq)),
     )
-
-class prog_lv2_seq_tail(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
-        k('term', o(
-            s(
-                t(KS_PRG_MRG), prog_lv1,
-            ),
-            prog_lv2,
-        )),
-        blankline,
-        k('...', prog_lv2_seq_tail),
-    ))
 
 class prog_lv2(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -267,6 +250,8 @@ class cexp_br(astnode):
 
 if __name__ == '__main__':
 
+    import sys
+    sys.setrecursionlimit(2000)
     from pdb import pm
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:
