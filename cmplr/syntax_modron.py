@@ -120,11 +120,6 @@ class regref_rd(astnode):
         k('alloc', t(None, 'word')),
     )
 
-class namespace(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        t('not_implement'),
-    )
-
 class sequence(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('ref', sectref),
@@ -137,11 +132,82 @@ class sectref(astnode):
         k('sect', t(None, 'word')),
     )
 
+class namespace(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('declare', declare),
+        blankline,
+        k('...', m(namespace)),
+    )
+
+class declare(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', t(None, 'word')),
+        t(KS_DCL),
+        k('limit', calcexpr),
+    )
+
+class calcexpr(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('expr', cexp_lv1),
+    )
+
+class cexp_lv1(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('expr', cexp_lv2),
+        k('...', cexp_lv1_tail),
+    )
+
+class cexp_lv1_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('op', o(
+            t(KS_EXP_ADD), t(KS_EXP_SUB),
+        )),
+        k('expr', cexp_lv2),
+        k('...', cexp_lv1_tail),
+    ))
+
+class cexp_lv2(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('expr', cexp_uop),
+        k('...', cexp_lv2_tail),
+    )
+
+class cexp_lv2_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('op', o(
+            t(KS_EXP_MUL), t(KS_EXP_DIV),
+        )),
+        k('expr', cexp_uop),
+        k('...', cexp_lv2_tail),
+    ))
+
+class cexp_uop(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('op', m(o(
+            t(KS_NEG),
+        ))),
+        k('expr', cexp_term),
+    )
+
+class cexp_term(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        k('expr', cexp_br),
+        k('term', regref_rd),
+        k('term', unsigned_integer),
+    )
+
+class cexp_br(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        t(KS_EXP_BR1),
+        k('expr', cexp_lv1),
+        t(KS_EXP_BR2),
+    )
+
 if __name__ == '__main__':
 
     from pdb import pm
     def test1():
-        with open('../test2.mdr.txt', 'r') as fd:
+        with open('../test1.mdr.txt', 'r') as fd:
             raw = fd.read()
         psr = c_parser(module, raw)
         rt = psr.parse()
