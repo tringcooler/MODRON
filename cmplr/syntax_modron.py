@@ -134,12 +134,14 @@ class namespace(astnode):
 class sequence(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('name', sectref),
+        blankline,
         k('...', sectrefs),
     )
 
 class sectrefs(astnode):
     DESC = lambda s,o,m,k,t: m(s(
         k('name', sectref),
+        blankline,
         k('...', sectrefs),
     ))
 
