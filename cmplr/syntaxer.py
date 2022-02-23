@@ -42,6 +42,7 @@ class c_tok_stream:
     def reset(self):
         self.strm = self.lx.parse()
         self.cache = []
+        self.cache_offs = 0
 
     def meta(self, k):
         m = self.metainfo 
@@ -52,6 +53,9 @@ class c_tok_stream:
 
     def shift(self, n):
         return c_tok_stream_shift(self, n)
+
+    def walked(self, n = 0):
+        return self.cache_offs + n
 
     def la(self, n = 0):
         while n + 1 > len(self.cache):
@@ -91,6 +95,7 @@ class c_tok_stream:
 
     def go(self):
         self.cache.pop(0)
+        self.cache_offs += 1
 
 class c_tok_stream_shift(c_tok_stream):
 
@@ -105,6 +110,9 @@ class c_tok_stream_shift(c_tok_stream):
     def shift(self, n):
         return self.src.shift(self.offset + n)
 
+    def walked(self, n = 0):
+        return self.src.walked(n) + self.offset
+
     def la(self, n = 0):
         return self.src.la(self.offset + n)
 
@@ -117,17 +125,44 @@ class c_nddesc:
         self.seq = seq
 
     def rec_unmatch(self, strm, ctx, ext = None):
-        if not 'umlog' in ctx:
-            ctx['umlog'] = []
-        if ext:
-            log = (strm.pos(), ext)
-        else:
-            log = (strm.pos(),)
-        ctx['umlog'].append(log)
+        pass
 
     def rec_match(self, strm, ctx):
-        if 'umlog' in ctx:
-            ctx['umlog'] = []
+        pass
+
+    def _rec_mostmatch(self, strm, ctx, caneq):
+        if not 'mostmatch' in ctx:
+            mm = {
+                'walked': -1,
+            }
+            ctx['mostmatch'] = mm
+        else:
+            mm = ctx['mostmatch']
+        walked = strm.walked()
+        if walked < mm['walked']:
+            return None
+        elif walked == mm['walked'] and not caneq:
+            return None
+        mm['walked'] = walked
+        return mm
+
+    def rec_unmatch_term(self, strm, ctx):
+        mm = self._rec_mostmatch(strm, ctx, False)
+        if not mm:
+            return
+        ut = {}
+        mm['unmatch'] = ut
+        if 'ast_stack' in ctx:
+            ut['ast_stack'] = ctx['ast_stack'].copy()
+        else:
+            ut['ast_stack'] = [('unkonown', strm.pos())]
+
+    def rec_match_term(self, strm, ctx):
+        mm = self._rec_mostmatch(strm, ctx, True)
+        if not mm:
+            return
+        if 'unmatch' in mm:
+            del mm['unmatch']
 
     def match(self, strm, flw, ctx):
         raise NotImplementedError
@@ -213,8 +248,10 @@ class c_ndd_term(c_nddesc):
         tt, tv = strm.tok()
         if term_typ != tt or (
             term_val and term_val != tv):
+            self.rec_unmatch_term(strm, ctx)
             self.rec_unmatch(strm, ctx)
             return None
+        self.rec_match_term(strm, ctx)
         r = c_ndresult({'typ': 'term'}, tt, tv)
         if flw:
             flndd = flw[0]
@@ -301,8 +338,6 @@ class astnode:
         if not rseq:
             cls.rec_unmatch(strm, ctx)
             return None
-            #raise (err_syntax('unmatched').set('nd', cls.__name__)
-            #    .setpos(strm.pos()))
         ndr = rseq[0]
         node = cls()
         v = cls._parsendr(node, ndr)
@@ -357,14 +392,9 @@ class c_parser:
         ctx = {}
         rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')], ctx)
         if not rseq:
-            for log in ctx['umlog']:
-                if len(log) < 2:
-                    continue
-                print(*log)
-            print('=====')
-            for log in ctx['ast_stack']:
-                print(*log)
-            raise err_syntax('unmatch')
+            ut = ctx['mostmatch']['unmatch']
+            umname, umpos = ut['ast_stack'][-1]
+            raise err_syntax('unmatch').setpos(umpos).set('nd', umname)
         return rseq[0]
 
 if __name__ == '__main__':
