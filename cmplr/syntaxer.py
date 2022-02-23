@@ -146,12 +146,13 @@ class c_nddesc:
         mm['walked'] = walked
         return mm
 
-    def rec_unmatch_term(self, strm, ctx):
+    def rec_unmatch_term(self, strm, ctx, stok, dtok):
         mm = self._rec_mostmatch(strm, ctx, False)
         if not mm:
             return
         ut = {}
         mm['unmatch'] = ut
+        ut['toks'] = (stok, dtok)
         if 'ast_stack' in ctx:
             ut['ast_stack'] = ctx['ast_stack'].copy()
         else:
@@ -248,7 +249,8 @@ class c_ndd_term(c_nddesc):
         tt, tv = strm.tok()
         if term_typ != tt or (
             term_val and term_val != tv):
-            self.rec_unmatch_term(strm, ctx)
+            self.rec_unmatch_term(strm, ctx,
+                (tt, tv), (term_typ, term_val))
             self.rec_unmatch(strm, ctx)
             return None
         self.rec_match_term(strm, ctx)
@@ -395,8 +397,17 @@ class c_parser:
         if not rseq:
             ut = ctx['mostmatch']['unmatch']
             umname, umpos = ut['ast_stack'][-1]
-            raise err_syntax('unmatch').setpos(umpos).set('nd', umname)
+            stok, dtok = ut['toks']
+            raise err_syntax(f'unmatch {stok} should be {dtok}').setpos(umpos).set('nd', umname)
         return rseq[0]
+
+    def trace_err(self):
+        try:
+            ustk = self.last_ctx['mostmatch']['unmatch']['ast_stack']
+        except:
+            return
+        for ndname, pos in ustk:
+            print(f'nd:{ndname} ln:{pos[0]} col:{pos[1]}')
 
 if __name__ == '__main__':
 
