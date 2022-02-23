@@ -57,14 +57,8 @@ class label(astnode):
 class prog(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('stmt', prog_stmt),
-        k('...', prog_stmts),
+        k('...', m(prog)),
     )
-
-class prog_stmts(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
-        k('stmt', prog_stmt),
-        k('...', prog_stmts),
-    ))
 
 class prog_stmt(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -111,7 +105,7 @@ class unsigned_integer(astnode):
 
 class signed_integer(astnode):
     DESC = lambda s,o,m,k,t: s(
-        m(k('neg', t(KS_NEG))),
+        k('neg', m(t(KS_NEG))),
         k('value', unsigned_integer),
     )
 
@@ -133,17 +127,10 @@ class namespace(astnode):
 
 class sequence(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('name', sectref),
+        k('ref', sectref),
         blankline,
-        k('...', sectrefs),
+        k('...', m(sequence)),
     )
-
-class sectrefs(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
-        k('name', sectref),
-        blankline,
-        k('...', sectrefs),
-    ))
 
 class sectref(astnode):
     DESC = lambda s,o,m,k,t: s(
