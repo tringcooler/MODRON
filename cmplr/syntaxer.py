@@ -267,8 +267,18 @@ class astnode:
             raise NotImplemented
 
     @classmethod
+    def rec_aststack(cls, strm, ctx, push):
+        if not 'aststack' in ctx:
+            ctx['aststack'] = []
+        if push:
+            ctx['aststack'].append((cls.__name__, strm.pos()))
+        else:
+            ctx['aststack'].pop()
+
+    @classmethod
     def match(cls, strm, flw, ctx):
         ndd = cls.nddesc()
+        cls.rec_aststack(strm, ctx, True)
         rseq = ndd.match(strm, flw, ctx)
         if not rseq:
             raise (err_syntax('unmatched').set('nd', cls.__name__)
@@ -278,7 +288,8 @@ class astnode:
         v = cls._parsendr(node, ndr)
         if not v:
             node.isempty = True
-        self.rec_match(strm, ctx)
+        cls.rec_aststack(strm, ctx, False)
+        ndd.rec_match(strm, ctx)
         return [node, *rseq[1:]]
 
     def show(self, lv=0, padding = '  '):
