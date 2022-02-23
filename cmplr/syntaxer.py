@@ -116,10 +116,14 @@ class c_nddesc:
     def __init__(self, *seq):
         self.seq = seq
 
-    def rec_unmatch(self, strm, ctx):
+    def rec_unmatch(self, strm, ctx, ext = None):
         if not 'umlog' in ctx:
             ctx['umlog'] = []
-        ctx['umlog'].append(strm.pos())
+        if ext:
+            log = (strm.pos(), ext)
+        else:
+            log = (strm.pos(),)
+        ctx['umlog'].append(log)
 
     def rec_match(self, strm, ctx):
         if 'umlog' in ctx:
@@ -228,6 +232,7 @@ class c_ndd_term(c_nddesc):
 class astnode:
 
     DESC = None
+    _nddesc = None
 
     def __init__(self):
         self.nodes = {}
@@ -235,8 +240,10 @@ class astnode:
 
     @classmethod
     def nddesc(cls):
-        return cls.DESC(
-            c_ndd_seq, c_ndd_or, c_ndd_maybe, c_ndd_pair, c_ndd_term)
+        if not cls._nddesc:
+            cls._nddesc = cls.DESC(
+                c_ndd_seq, c_ndd_or, c_ndd_maybe, c_ndd_pair, c_ndd_term)
+        return cls._nddesc
 
     @classmethod
     def _parsendr(cls, node, ndr):
@@ -268,28 +275,40 @@ class astnode:
 
     @classmethod
     def rec_aststack(cls, strm, ctx, push):
-        if not 'aststack' in ctx:
-            ctx['aststack'] = []
+        if not 'ast_stack' in ctx:
+            ctx['ast_stack'] = []
         if push:
-            ctx['aststack'].append((cls.__name__, strm.pos()))
+            ctx['ast_stack'].append((cls.__name__, strm.pos()))
         else:
-            ctx['aststack'].pop()
+            ctx['ast_stack'].pop()
+
+    @classmethod
+    def rec_unmatch(cls, strm, ctx):
+        ndd = cls.nddesc()
+        ndd.rec_unmatch(strm, ctx, cls.__name__)
+
+    @classmethod
+    def rec_match(cls, strm, ctx):
+        ndd = cls.nddesc()
+        ndd.rec_match(strm, ctx)
 
     @classmethod
     def match(cls, strm, flw, ctx):
         ndd = cls.nddesc()
         cls.rec_aststack(strm, ctx, True)
         rseq = ndd.match(strm, flw, ctx)
+        cls.rec_aststack(strm, ctx, False)
         if not rseq:
-            raise (err_syntax('unmatched').set('nd', cls.__name__)
-                .setpos(strm.pos()))
+            cls.rec_unmatch(strm, ctx)
+            return None
+            #raise (err_syntax('unmatched').set('nd', cls.__name__)
+            #    .setpos(strm.pos()))
         ndr = rseq[0]
         node = cls()
         v = cls._parsendr(node, ndr)
         if not v:
             node.isempty = True
-        cls.rec_aststack(strm, ctx, False)
-        ndd.rec_match(strm, ctx)
+        cls.rec_match(strm, ctx)
         return [node, *rseq[1:]]
 
     def show(self, lv=0, padding = '  '):
@@ -335,7 +354,17 @@ class c_parser:
 
     def parse(self):
         self.reset()
-        rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')], {})
+        ctx = {}
+        rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')], ctx)
+        if not rseq:
+            for log in ctx['umlog']:
+                if len(log) < 2:
+                    continue
+                print(*log)
+            print('=====')
+            for log in ctx['ast_stack']:
+                print(*log)
+            raise err_syntax('unmatch')
         return rseq[0]
 
 if __name__ == '__main__':
