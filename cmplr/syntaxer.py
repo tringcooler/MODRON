@@ -390,6 +390,7 @@ class c_parser:
     def parse(self):
         self.reset()
         ctx = {}
+        self.last_ctx = ctx
         rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')], ctx)
         if not rseq:
             ut = ctx['mostmatch']['unmatch']

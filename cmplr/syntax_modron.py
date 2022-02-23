@@ -9,6 +9,11 @@ KS_NEG = '-'
 KS_PRS_EQ = '='
 KS_PRS_PL = '+'
 KS_DCL = '>'
+
+KS_PRG_BR1 = '{'
+KS_PRG_BR2 = '}'
+KS_PRG_MRG = '+'
+
 KS_EXP_BR1 = '('
 KS_EXP_BR2 = ')'
 KS_EXP_ADD = '+'
@@ -45,7 +50,7 @@ class sect(astnode):
         k('label', label),
         blankline,
         k('content', o(
-            prog, namespace, sequence,
+            prog, namespace,
         )),
     )
 
@@ -56,12 +61,81 @@ class label(astnode):
 
 class prog(astnode):
     DESC = lambda s,o,m,k,t: s(
+        k('prog', prog_lv1_seq),
+    )
+
+class prog_lv1_seq(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('term', prog_lv1_or_seq),
+        blankline,
+        k('...', m(prog_lv1_seq)),
+    )
+
+class prog_lv1_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('term', o(
+            s(
+                t(KS_PRG_MRG), o(
+                    prog_lv1_seq, prog_lv2
+                ),
+            ),
+            prog_lv1_seq,
+        )),
+        blankline,
+        k('...', prog_lv1_seq_tail),
+    ))
+
+class prog_lv1_or_seq(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        k('seq', prog_lv2_seq),
+        k('term', prog_lv1),
+    )
+
+class prog_lv1(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        k('block', prog_block),
+        k('ref', prog_ref),
+    )
+
+class prog_ref(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', t(None, 'word')),
+    )
+
+class prog_lv2_seq(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('term', prog_lv2),
+        blankline,
+        k('...', prog_lv2_seq_tail),
+    )
+
+class prog_lv2_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('term', o(
+            s(
+                t(KS_PRG_MRG), prog_lv1,
+            ),
+            prog_lv2,
+        )),
+        blankline,
+        k('...', prog_lv2_seq_tail),
+    ))
+
+class prog_lv2(astnode):
+    DESC = lambda s,o,m,k,t: o(
         k('stmt', prog_stmt),
-        k('...', m(prog)),
+    )
+
+class prog_block(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        t(KS_PRG_BR1),
+        k('seq', prog_lv1_seq),
+        t(KS_PRG_BR2),
     )
 
 class prog_stmt(astnode):
     DESC = lambda s,o,m,k,t: s(
+        t(None, 'newline'),
         k('condi', condi_seq),
         t(KS_OPS),
         k('op', op_seq),
@@ -118,18 +192,6 @@ class regref_wr(astnode):
 class regref_rd(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('alloc', t(None, 'word')),
-    )
-
-class sequence(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('ref', sectref),
-        blankline,
-        k('...', m(sequence)),
-    )
-
-class sectref(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('sect', t(None, 'word')),
     )
 
 class namespace(astnode):
@@ -207,9 +269,13 @@ if __name__ == '__main__':
 
     from pdb import pm
     def test1():
-        with open('../test1.mdr.txt', 'r') as fd:
+        with open('../test2.mdr.txt', 'r') as fd:
             raw = fd.read()
         psr = c_parser(module, raw)
-        rt = psr.parse()
+        try:
+            rt = psr.parse()
+        except Exception as e:
+            print('err:', e)
+            rt = None
         return psr, rt
     psr, rt = test1()
