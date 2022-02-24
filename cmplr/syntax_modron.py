@@ -45,6 +45,12 @@ class sects(astnode):
         k('sect', sect),
         k('...', sects_tail),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('sect')
+            yield 'sect', snd.sub('label').sub('name'), snd.sub('content')
+            nd = nd.nodes['...']
 
 class sects_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -83,6 +89,12 @@ class prog_seq(astnode):
             k('...', prog_seq_tail_2),
         ),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('term')
+            yield 'term', snd
+            nd = nd.nodes['...']
 
 class prog_seq_tail_1(astnode):
     DESC = lambda s,o,m,k,t: m(o(
@@ -159,6 +171,12 @@ class condi_seq(astnode):
         k('pair', condi_pair),
         k('...', condi_seq),
     ))
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('pair')
+            yield 'pair', snd
+            nd = nd.nodes['...']
 
 class condi_pair(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -174,6 +192,12 @@ class op_seq(astnode):
         k('pair', op_pair),
         k('...', op_seq),
     ))
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('pair')
+            yield 'pair', snd
+            nd = nd.nodes['...']
 
 class op_pair(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -283,11 +307,7 @@ if __name__ == '__main__':
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:
             raw = fd.read()
+        global psr, rt
         psr = c_parser(module, raw)
-        try:
-            rt = psr.parse()
-        except Exception as e:
-            print('err:', e)
-            rt = None
-        return psr, rt
-    psr, rt = test1()
+        rt = psr.parse()
+    test1()

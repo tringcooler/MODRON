@@ -361,6 +361,11 @@ class astnode:
                 return True
         return False
 
+    def sub(self, ndkey):
+        if not ndkey in self.nodes:
+            return None
+        return self.nodes[ndkey]
+
     def tidy(self):
         nds = self.nodes
         for k in nds:
@@ -376,7 +381,8 @@ class astnode:
             return
         print(self.__class__.__name__)
         pad = padding * (lv + 1)
-        for k, nd in self.tidy():
+        for *ks, nd in self.tidy():
+            k = '/'.join(ks)
             if not nd:
                 print(pad + f'{k}: None')
             elif isinstance(nd, list):
@@ -432,8 +438,9 @@ class c_parser:
             ustk = self.last_ctx['mostmatch']['unmatch']['ast_stack']
         except:
             return
-        for ndname, pos in ustk:
-            print(f'nd:{ndname} ln:{pos[0]} col:{pos[1]}')
+        for ndname, pos, imp in ustk:
+            if not important or imp:
+                print(f'nd:{ndname} ln:{pos[0]} col:{pos[1]}')
 
 if __name__ == '__main__':
 
