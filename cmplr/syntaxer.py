@@ -350,14 +350,27 @@ class astnode:
         cls.rec_match(strm, ctx)
         return [node, *rseq[1:]]
 
+    def chknd(self, ndkey, *ndtyps):
+        if not ndkey in self.nodes:
+            return False
+        nd = self.nodes[ndkey]
+        for ndtyp in ndtyps:
+            if isinstance(nd, ndtyp):
+                return True
+        return False
+
+    def tidy(self):
+        nds = self.nodes
+        for k in nds:
+            yield k, nds[k]
+
     def show(self, lv=0, padding = '  '):
         if self.isempty:
             print('empty')
             return
         print(self.__class__.__name__)
         pad = padding * (lv + 1)
-        for k in self.nodes:
-            nd = self.nodes[k]
+        for k, nd in self.tidy():
             if not nd:
                 print(pad + f'{k}: None')
             elif isinstance(nd, list):
