@@ -250,8 +250,6 @@ class cexp_br(astnode):
 
 if __name__ == '__main__':
 
-    import sys
-    sys.setrecursionlimit(2000)
     from pdb import pm
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:

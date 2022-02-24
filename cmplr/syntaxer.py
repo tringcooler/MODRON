@@ -1,6 +1,8 @@
 #! python3
 # coding: utf-8
 
+from flatinvoker import flat_invoker as fliv
+
 class err_syntax(Exception):
 
     def __init__(self, *na):
@@ -179,7 +181,7 @@ class c_ndd_seq(c_nddesc):
     def match(self, strm, flw, ctx):
         cur_seq = [*self.seq[1:], *flw]
         ndd = self.seq[0]
-        rseq = ndd.match(strm, cur_seq, ctx)
+        rseq = yield fliv.invoke(ndd.match, strm, cur_seq, ctx)
         if not rseq:
             self.rec_unmatch(strm, ctx)
             return rseq
@@ -192,7 +194,7 @@ class c_ndd_or(c_nddesc):
 
     def match(self, strm, flw, ctx):
         for ndd in self.seq:
-            rseq = ndd.match(strm, flw, ctx)
+            rseq = yield fliv.invoke(ndd.match, strm, flw, ctx)
             if rseq:
                 self.rec_match(strm, ctx)
                 return rseq
@@ -204,7 +206,7 @@ class c_ndd_maybe(c_nddesc):
 
     def match(self, strm, flw, ctx):
         ndd = self.seq[0]
-        rseq = ndd.match(strm, flw, ctx)
+        rseq = yield fliv.invoke(ndd.match, strm, flw, ctx)
         if rseq:
             self.rec_match(strm, ctx)
             return rseq
@@ -212,7 +214,7 @@ class c_ndd_maybe(c_nddesc):
         if flw:
             flndd = flw[0]
             flseq = flw[1:]
-            flrseq = flndd.match(strm, flseq, ctx)
+            flrseq = yield fliv.invoke(flndd.match, strm, flseq, ctx)
             if not flrseq:
                 self.rec_unmatch(strm, ctx)
                 return flrseq
@@ -226,7 +228,7 @@ class c_ndd_pair(c_nddesc):
 
     def match(self, strm, flw, ctx):
         key, ndd = self.seq
-        rseq = ndd.match(strm, flw, ctx)
+        rseq = yield fliv.invoke(ndd.match, strm, flw, ctx)
         if not rseq:
             self.rec_unmatch(strm, ctx)
             return rseq
@@ -258,7 +260,7 @@ class c_ndd_term(c_nddesc):
         if flw:
             flndd = flw[0]
             flseq = flw[1:]
-            flrseq = flndd.match(strm.shift(1), flseq, ctx)
+            flrseq = yield fliv.invoke(flndd.match, strm.shift(1), flseq, ctx)
             if not flrseq:
                 self.rec_unmatch(strm, ctx)
                 return flrseq
@@ -335,7 +337,7 @@ class astnode:
     def match(cls, strm, flw, ctx):
         ndd = cls.nddesc()
         cls.rec_aststack(strm, ctx, True)
-        rseq = ndd.match(strm, flw, ctx)
+        rseq = yield fliv.invoke(ndd.match, strm, flw, ctx)
         cls.rec_aststack(strm, ctx, False)
         if not rseq:
             cls.rec_unmatch(strm, ctx)
@@ -393,7 +395,7 @@ class c_parser:
         self.reset()
         ctx = {}
         self.last_ctx = ctx
-        rseq = self.rootnd.match(self.stream, [c_ndd_term(None, 'eof')], ctx)
+        rseq = fliv.start(self.rootnd.match, self.stream, [c_ndd_term(None, 'eof')], ctx)
         if not rseq:
             ut = ctx['mostmatch']['unmatch']
             umname, umpos = ut['ast_stack'][-1]
