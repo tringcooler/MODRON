@@ -3,27 +3,37 @@
 
 class c_fi_coroutine:
 
-    def __new__(cls, itr):
-        try:
-            nxt = next(itr)
-        except TypeError:
-            co = itr
-        except StopIteration as e:
-            co = e.value
-        else:
-            co = super().__new__(cls)
-            co.invoke = nxt
+    def __init__(self, func, *na, **ka):
+        self.fargs = (func, na, ka)
+        self.isstart = False
+
+    def start(self):
+        co = self
+        while isinstance(co, c_fi_coroutine) and not co.isstart:
+            co = co._start()
         return co
 
-    def __init__(self, itr):
-        self.iter = itr
+    def _start(self):
+        func, na, ka = self.fargs
+        gen = func(*na, **ka)
+        isret = False
+        try:
+            nxt = next(gen)
+        except TypeError:
+            return gen
+        except StopIteration as e:
+            return e.value
+        self.gen = gen
+        self.invoke = nxt
         self.isdone = False
+        self.isstart = True
+        return self
 
     def goon(self, ret):
         if self.isdone:
             raise RuntimeError('co-routine is done')
         try:
-            nxt = self.iter.send(ret)
+            nxt = self.gen.send(ret)
         except StopIteration as e:
             nxt = e.value
             self.isdone = True
@@ -33,8 +43,7 @@ class flat_invoker:
 
     @staticmethod
     def invoke(func, *na, **ka):
-        itr = func(*na, **ka)
-        return c_fi_coroutine(itr)
+        return c_fi_coroutine(func, *na, **ka)
 
     @staticmethod
     def run(stack):
@@ -46,11 +55,13 @@ class flat_invoker:
             if co.isdone:
                 stack.pop()
             if isinstance(nco, c_fi_coroutine):
-                stack.append(nco)
-                stklen = len(stack)
-                if stklen > maxdeep:
-                    maxdeep = stklen
-                continue
+                nco = nco.start()
+                if isinstance(nco, c_fi_coroutine):
+                    stack.append(nco)
+                    stklen = len(stack)
+                    if stklen > maxdeep:
+                        maxdeep = stklen
+                    continue
             ret = nco
             if not co.isdone:
                 co.goon(ret)
@@ -63,9 +74,10 @@ class flat_invoker:
 
     @classmethod
     def start(cls, *na, **ka):
-        co = cls.invoke(*na, **ka)
+        co = cls.invoke(*na, **ka).start()
         if not isinstance(co, c_fi_coroutine):
             return co
+        co.invoke
         return cls.run([co])
 
 if __name__ == '__main__':
@@ -113,7 +125,7 @@ if __name__ == '__main__':
             return v
         else:
             return fi.invoke(ff3, n-1, 2 * v)
-        yield 'padding'
+        #yield 'padding'
 
     def test():
         pass
