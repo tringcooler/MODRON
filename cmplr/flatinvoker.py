@@ -69,7 +69,7 @@ class flat_invoker:
             if stack:
                 pco = stack[-1]
                 pco.goon(ret)
-        print('done', maxdeep)
+        #print('done', maxdeep)
         return ret
 
     @classmethod
@@ -81,53 +81,4 @@ class flat_invoker:
         return cls.run([co])
 
 if __name__ == '__main__':
-
-    def tf1(n):
-        if n < 2:
-            return 1
-        else:
-            a = tf1(n-1)
-            b = tf1(n-2)
-            return a + b
-
-    def tf2(n, v):
-        if n < 2:
-            return v + 1
-        else:
-            a = tf2(n-1, v)
-            return tf2(n-1, a)
-
-    def tf3(n, v):
-        if n < 1:
-            return v
-        else:
-            return tf3(n-1, 2 * v)
-
-    fi = flat_invoker
-    
-    def ff1(n):
-        if n < 2:
-            return 1
-        else:
-            a = yield fi.invoke(ff1, n-1)
-            b = yield fi.invoke(ff1, n-2)
-            return a + b
-
-    def ff2(n, v):
-        if n < 2:
-            return v + 1
-        else:
-            a = yield fi.invoke(ff2, n-1, v)
-            return fi.invoke(ff2, n-1, a)
-
-    def ff3(n, v):
-        if n < 1:
-            return v
-        else:
-            return fi.invoke(ff3, n-1, 2 * v)
-        #yield 'padding'
-
-    def test():
-        pass
-
-    test()
+    pass
