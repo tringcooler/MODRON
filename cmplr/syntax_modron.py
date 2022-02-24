@@ -24,7 +24,8 @@ KS_EXP_DIV = '/'
 class module(astnode):
     DESC = lambda s,o,m,k,t: s(
         blankline,
-        k('sects', sects),
+        k('sects', m(sects)),
+        blankline,
     )
 
 class nblankline(astnode):
@@ -40,9 +41,16 @@ class blankline(astnode):
     ))
 
 class sects(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
+    DESC = lambda s,o,m,k,t: s(
         k('sect', sect),
-        k('...', sects),
+        k('...', sects_tail),
+    )
+
+class sects_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        nblankline,
+        k('sect', sect),
+        k('...', sects_tail),
     ))
 
 class sect(astnode):
@@ -61,30 +69,60 @@ class label(astnode):
 
 class prog(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('prog', prog_lv1_seq),
+        k('prog', prog_seq),
     )
 
-class prog_lv1_seq(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('term', prog_lv1_or_seq),
-        blankline,
-        k('...', prog_lv1_seq_tail),
+class prog_seq(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        s(
+            k('term', prog_lv1),
+            k('...', prog_seq_tail_1),
+        ),
+        s(
+            k('term', prog_lv2),
+            k('...', prog_seq_tail_2),
+        ),
     )
 
-class prog_lv1_seq_tail(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
-        k('merge', m(t(KS_PRG_MRG))),
-        blankline,
-        k('term', prog_lv1_or_seq),
-        blankline,
-        k('...', m(prog_lv1_seq_tail)),
+class prog_seq_tail_1(astnode):
+    DESC = lambda s,o,m,k,t: m(o(
+        s(
+            blankline,
+            m(s(
+                k('merge', t(KS_PRG_MRG)),
+                blankline,
+            )),
+            k('term', prog_lv1),
+            k('...', prog_seq_tail_1),
+        ),
+        s(
+            m(s(
+                blankline,
+                k('merge', t(KS_PRG_MRG)),
+            )),
+            nblankline,
+            k('term', prog_lv2),
+            k('...', prog_seq_tail_2),
+        ),
     ))
 
-class prog_lv1_or_seq(astnode):
-    DESC = lambda s,o,m,k,t: o(
-        k('seq', prog_lv2_seq),
-        k('term', prog_lv1),
-    )
+class prog_seq_tail_2(astnode):
+    DESC = lambda s,o,m,k,t: m(o(
+        s(
+            nblankline,
+            m(s(
+                k('merge', t(KS_PRG_MRG)),
+                blankline,
+            )),
+            k('term', prog_lv1),
+            k('...', prog_seq_tail_1),
+        ),
+        s(
+            nblankline,
+            k('term', prog_lv2),
+            k('...', prog_seq_tail_2),
+        ),
+    ))
 
 class prog_lv1(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -97,13 +135,6 @@ class prog_ref(astnode):
         k('name', t(None, 'word')),
     )
 
-class prog_lv2_seq(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('term', prog_lv2),
-        blankline,
-        k('...', m(prog_lv2_seq)),
-    )
-
 class prog_lv2(astnode):
     DESC = lambda s,o,m,k,t: o(
         k('stmt', prog_stmt),
@@ -112,17 +143,15 @@ class prog_lv2(astnode):
 class prog_block(astnode):
     DESC = lambda s,o,m,k,t: s(
         t(KS_PRG_BR1),
-        k('seq', prog_lv1_seq),
+        k('seq', prog_seq),
         t(KS_PRG_BR2),
     )
 
 class prog_stmt(astnode):
     DESC = lambda s,o,m,k,t: s(
-        t(None, 'newline'),
         k('condi', condi_seq),
         t(KS_OPS),
         k('op', op_seq),
-        nblankline,
     )
 
 class condi_seq(astnode):
