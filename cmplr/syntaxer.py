@@ -155,10 +155,11 @@ class c_nddesc:
         ut = {}
         mm['unmatch'] = ut
         ut['toks'] = (stok, dtok)
+        ut['pos'] = strm.pos()
         if 'ast_stack' in ctx:
             ut['ast_stack'] = ctx['ast_stack'].copy()
         else:
-            ut['ast_stack'] = [('unkonown', strm.pos())]
+            ut['ast_stack'] = [('unkonown', ut['pos'], True)]
 
     def rec_match_term(self, strm, ctx):
         mm = self._rec_mostmatch(strm, ctx, True)
@@ -319,7 +320,8 @@ class astnode:
         if not 'ast_stack' in ctx:
             ctx['ast_stack'] = []
         if push:
-            ctx['ast_stack'].append((cls.__name__, strm.pos()))
+            ctx['ast_stack'].append((
+                cls.__name__, strm.pos(), cls.important()))
         else:
             ctx['ast_stack'].pop()
 
@@ -363,6 +365,10 @@ class astnode:
         nds = self.nodes
         for k in nds:
             yield k, nds[k]
+
+    @classmethod
+    def important(cls):
+        return not cls.tidy is astnode.tidy
 
     def show(self, lv=0, padding = '  '):
         if self.isempty:
@@ -411,12 +417,17 @@ class c_parser:
         rseq = fliv.start(self.rootnd.match, self.stream, [c_ndd_term(None, 'eof')], ctx)
         if not rseq:
             ut = ctx['mostmatch']['unmatch']
-            umname, umpos = ut['ast_stack'][-1]
+            for umname, umpos, umimp in reversed(ut['ast_stack']):
+                if umimp:
+                    break
             stok, dtok = ut['toks']
-            raise err_syntax(f'unmatch {stok} should be {dtok}').setpos(umpos).set('nd', umname)
+            pos = ut['pos']
+            raise (err_syntax(
+                f'unmatch: {stok}(ln:{pos[0]} col:{pos[1]}) should be {dtok}')
+                .set('nd', umname).setpos(umpos))
         return rseq[0]
 
-    def trace_err(self):
+    def trace_err(self, important = True):
         try:
             ustk = self.last_ctx['mostmatch']['unmatch']['ast_stack']
         except:
