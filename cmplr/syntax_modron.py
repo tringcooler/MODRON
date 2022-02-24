@@ -161,22 +161,28 @@ class prog_block(astnode):
 
 class prog_stmt(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('condi', condi_seq),
+        k('condi', m(condi_seq)),
         t(KS_OPS),
-        k('op', op_seq),
+        k('op', m(op_seq)),
     )
 
 class condi_seq(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
+    DESC = lambda s,o,m,k,t: s(
         k('pair', condi_pair),
-        k('...', condi_seq),
-    ))
+        k('...', condi_seq_tail),
+    )
     def tidy(self):
         nd = self
         while not nd.isempty:
             snd = nd.sub('pair')
             yield 'pair', snd
             nd = nd.nodes['...']
+
+class condi_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('pair', condi_pair),
+        k('...', condi_seq_tail),
+    ))
 
 class condi_pair(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -188,16 +194,22 @@ class condi_pair(astnode):
     )
 
 class op_seq(astnode):
-    DESC = lambda s,o,m,k,t: m(s(
+    DESC = lambda s,o,m,k,t: s(
         k('pair', op_pair),
-        k('...', op_seq),
-    ))
+        k('...', op_seq_tail),
+    )
     def tidy(self):
         nd = self
         while not nd.isempty:
             snd = nd.sub('pair')
             yield 'pair', snd
             nd = nd.nodes['...']
+
+class op_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('pair', op_pair),
+        k('...', op_seq_tail),
+    ))
 
 class op_pair(astnode):
     DESC = lambda s,o,m,k,t: s(
