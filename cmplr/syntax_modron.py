@@ -3,6 +3,10 @@
 
 from syntaxer import astnode, c_parser
 
+#===============
+# syntax define
+#===============
+
 KS_LBL = ':'
 KS_OPS = '/'
 KS_NEG = '-'
@@ -86,7 +90,7 @@ class sect(astnode):
         c.ctx['seq'] = []
         if nsreq:
             c.c(nsreq)
-            nr_seq = c.getpath('temp', 'nsref_seq')
+            nr_seq = c.getpath('ret')
             c.ctx['nsreq'] = nr_seq
         c.c(ctt)
         c.archpath()
@@ -223,7 +227,7 @@ class nsref_seq(astnode):
             nd = nd.sub('...')
     def cmpl(self, c):
         c.new()
-        c.setpath('temp', 'nsref_seq')
+        c.setpath('ret')
         seq = []
         for _, nr in self.tidy():
             seq.append(nr)
@@ -420,6 +424,30 @@ class cexp_br(astnode):
         k('expr', cexp_lv1),
         t(KS_EXP_BR2),
     )
+
+#===============
+# compile utils
+#===============
+
+class c_expr_ctx:
+
+    def __init__(self, term):
+        val = self.getval(term)
+        argsp = []
+        if isinstance(val, str):
+            argsp.append(val)
+        self.value = val
+        self.argspace = argsp
+
+    @staticmethod
+    def getval(term):
+        if isinstance(term, c_expr_ctx) and not term.argspace:
+            return term.value
+        else:
+            return term
+
+    def resolve(self, op, term):
+        pass
 
 if __name__ == '__main__':
 
