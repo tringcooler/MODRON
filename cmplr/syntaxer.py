@@ -348,6 +348,8 @@ class astnode:
             yield k, nds[k]
 
     def cmpl(self, c):
+        if self.isempty:
+            return
         for *_, sub in self.tidy():
             if isinstance(sub, astnode):
                 sub.cmpl(c)

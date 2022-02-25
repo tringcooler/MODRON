@@ -14,6 +14,7 @@ KS_PRG_BR1 = '{'
 KS_PRG_BR2 = '}'
 KS_PRG_MRG = '+'
 
+KS_NSP_REQ = '@'
 KS_NSP_AL1 = '<'
 KS_NSP_AL2 = '>'
 
@@ -63,28 +64,64 @@ class sects_tail(astnode):
     ))
 
 class sect(astnode):
+    DESC = lambda s,o,m,k,t: k('sect', o(
+        sect_prog, sect_namespace,
+    ))
+
+class sect_prog(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('label', label),
+        k('label', label_prog),
         blankline,
-        k('content', o(
-            prog, namespace,
-        )),
+        k('content', prog),
     )
     def tidy(self):
-        yield self.sub('label').sub('name'), self.sub('content')
-    def cmpl(self, c):
-        [(lbl, ctt)] = self.tidy()
-        if isinstance(ctt, prog):
-            ctx = c.swctx('prog', lbl)
-        elif isinstance(ctt, namespace):
-            ctx = c.swctx('namespace', lbl)
+        nsreq = self.sub('label').sub('nsreq')
+        if nsreq:
+            nr = nsreq.sub('seq')
         else:
-            c.rerr('unknown sect')
-        
+            nr = None
+        yield 'namespace', nr
+        yield self.sub('label').sub('name').sub('name'), self.sub('content')
+    def cmpl(self, c):
+        (_, nsreq), (lbl, ctt) = self.tidy()
+        ctx = c.swctx('prog', lbl)
+        ctt.cmpl(c)
 
-class label(astnode):
+class sect_namespace(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('name', t(None, 'word')), t(KS_LBL),
+        k('label', label_namespace),
+        blankline,
+        k('content', namespace),
+    )
+    def tidy(self):
+        yield self.sub('label').sub('name').sub('name'), self.sub('content')
+    def cmpl(self, c):
+        (lbl, ctt), = self.tidy()
+        ctx = c.swctx('prog', lbl)
+        ctt.cmpl(c)
+
+class label_prog(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', sect_name),
+        k('nsreq', m(namespace_req)),
+        t(KS_LBL),
+    )
+
+class namespace_req(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        t(KS_NSP_REQ),
+        k('seq', nsref_seq),
+    )
+
+class label_namespace(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', sect_name),
+        t(KS_LBL),
+    )
+
+class sect_name(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', t(None, 'word'))
     )
 
 class prog(astnode):
