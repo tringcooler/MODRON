@@ -157,8 +157,8 @@ class prog_lv2(astnode):
 
 class prog_block(astnode):
     DESC = lambda s,o,m,k,t: s(
-        t(KS_PRG_BR1),
         k('ns', m(namespace_alloc)),
+        t(KS_PRG_BR1),
         k('seq', prog_seq),
         t(KS_PRG_BR2),
     )
@@ -182,6 +182,12 @@ class nsref_seq(astnode):
         k('ref', nsref),
         k('...', nsref_seq_tail),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('ref')
+            yield 'ref', snd.sub('name')
+            nd = nd.nodes['...']
 
 class nsref_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -274,8 +280,21 @@ class namespace(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('declare', declare),
         blankline,
-        k('...', m(namespace)),
+        k('...', namespace_tail),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('declare')
+            yield 'declare', snd
+            nd = nd.nodes['...']
+
+class namespace_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('declare', declare),
+        blankline,
+        k('...', namespace_tail),
+    ))
 
 class declare(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -294,6 +313,12 @@ class cexp_lv1(astnode):
         k('expr', cexp_lv2),
         k('...', cexp_lv1_tail),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('expr')
+            yield 'expr', snd
+            nd = nd.nodes['...']
 
 class cexp_lv1_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -309,6 +334,12 @@ class cexp_lv2(astnode):
         k('expr', cexp_uop),
         k('...', cexp_lv2_tail),
     )
+    def tidy(self):
+        nd = self
+        while not nd.isempty:
+            snd = nd.sub('expr')
+            yield 'expr', snd
+            nd = nd.nodes['...']
 
 class cexp_lv2_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
