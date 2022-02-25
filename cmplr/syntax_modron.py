@@ -14,6 +14,9 @@ KS_PRG_BR1 = '{'
 KS_PRG_BR2 = '}'
 KS_PRG_MRG = '+'
 
+KS_NSP_AL1 = '<'
+KS_NSP_AL2 = '>'
+
 KS_EXP_BR1 = '('
 KS_EXP_BR2 = ')'
 KS_EXP_ADD = '+'
@@ -155,6 +158,7 @@ class prog_lv2(astnode):
 class prog_block(astnode):
     DESC = lambda s,o,m,k,t: s(
         t(KS_PRG_BR1),
+        k('ns', m(namespace_alloc)),
         k('seq', prog_seq),
         t(KS_PRG_BR2),
     )
@@ -164,6 +168,30 @@ class prog_stmt(astnode):
         k('condi', m(condi_seq)),
         t(KS_OPS),
         k('op', m(op_seq)),
+    )
+
+class namespace_alloc(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        t(KS_NSP_AL1),
+        k('seq', nsref_seq),
+        t(KS_NSP_AL2),
+    )
+
+class nsref_seq(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('ref', nsref),
+        k('...', nsref_seq_tail),
+    )
+
+class nsref_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('ref', nsref),
+        k('...', nsref_seq_tail),
+    ))
+
+class nsref(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', t(None, 'word')),
     )
 
 class condi_seq(astnode):
@@ -319,7 +347,7 @@ if __name__ == '__main__':
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:
             raw = fd.read()
-        global psr, rt
+        global psr
         psr = c_parser(module, raw)
-        rt = psr.parse()
-    test1()
+        return psr.parse()
+    rt = test1()

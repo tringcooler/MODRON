@@ -383,7 +383,7 @@ class astnode:
         pad = padding * (lv + 1)
         for *ks, nd in self.tidy():
             k = '/'.join(ks)
-            if not nd:
+            if nd is None:
                 print(pad + f'{k}: None')
             elif isinstance(nd, list):
                 print(pad + f'{k}:')
