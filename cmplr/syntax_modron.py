@@ -52,7 +52,7 @@ class sects(astnode):
         nd = self
         while not nd.isempty:
             snd = nd.sub('sect')
-            yield 'sect', snd.sub('label').sub('name'), snd.sub('content')
+            yield 'sect', snd
             nd = nd.nodes['...']
 
 class sects_tail(astnode):
@@ -70,6 +70,17 @@ class sect(astnode):
             prog, namespace,
         )),
     )
+    def tidy(self):
+        yield self.sub('label').sub('name'), self.sub('content')
+    def cmpl(self, c):
+        [(lbl, ctt)] = self.tidy()
+        if isinstance(ctt, prog):
+            ctx = c.swctx('prog', lbl)
+        elif isinstance(ctt, namespace):
+            ctx = c.swctx('namespace', lbl)
+        else:
+            c.rerr('unknown sect')
+        
 
 class label(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -383,11 +394,14 @@ class cexp_br(astnode):
 
 if __name__ == '__main__':
 
+    from compiler import c_compiler
     from pdb import pm
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:
             raw = fd.read()
-        global psr
+        global psr, cmpl, rt
         psr = c_parser(module, raw)
-        return psr.parse()
-    rt = test1()
+        rt = psr.parse()
+        cmpl = c_compiler(rt)
+        cmpl.compile()
+    test1()

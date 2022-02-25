@@ -2,37 +2,10 @@
 # coding: utf-8
 
 from flatinvoker import flat_invoker as fliv
+from errparse import err_parse
 
-class err_syntax(Exception):
-
-    def __init__(self, *na):
-        super().__init__(*na)
-        self.pos = None
-        self.meta = {}
-
-    def setpos(self, pos):
-        if not self.pos:
-            self.pos = pos
-        return self
-
-    def set(self, k, v):
-        if not k in self.meta:
-            self.meta[k] = v
-        return self
-
-    def __str__(self):
-        msg = super().__str__()
-        tags = []
-        if self.meta:
-            for k in self.meta:
-                v = self.meta[k]
-                tags.append(f'{k}:{v}')
-        if self.pos:
-            tags.append(f'ln:{self.pos[0]}')
-            tags.append(f'col:{self.pos[1]}')
-        if tags:
-            msg = '(' + ', '.join(tags) + ') ' + msg
-        return msg
+class err_syntax(err_parse):
+    pass
 
 class c_tok_stream:
 
@@ -349,6 +322,9 @@ class astnode:
         v = cls._parsendr(node, ndr)
         if not v:
             node.isempty = True
+        node.meta = {
+            'pos': strm.pos(),
+        }
         cls.rec_match(strm, ctx)
         return [node, *rseq[1:]]
 
@@ -370,6 +346,11 @@ class astnode:
         nds = self.nodes
         for k in nds:
             yield k, nds[k]
+
+    def cmpl(self, c):
+        for *_, sub in self.tidy():
+            if isinstance(sub, astnode):
+                sub.cmpl(c)
 
     @classmethod
     def important(cls):

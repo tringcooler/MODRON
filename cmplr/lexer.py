@@ -1,10 +1,12 @@
 #! python3
 # coding: utf-8
 
+from errparse import err_parse
+
 KLX_CMT = '#'
 KLX_NL = '\n'
 
-class err_lexer(Exception):
+class err_lexer(err_parse):
     pass
 
 class c_lexer:
@@ -37,7 +39,7 @@ class c_lexer:
         return c
 
     def rerr(self, e):
-        raise err_lexer(f'(ln:{self.cpos[0]} col:{self.cpos[1]}) {e}')
+        raise err_lexer(e).setpos(self.cpos)
 
     def parse(self):
         while self.stat != 'end':
