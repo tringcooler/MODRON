@@ -84,7 +84,8 @@ class sect_prog(astnode):
         yield self.sub('label').sub('name').sub('name'), self.sub('content')
     def cmpl(self, c):
         (_, nsreq), (lbl, ctt) = self.tidy()
-        ctx = c.swctx('prog', lbl)
+        c.goto('prog', lbl)
+        c.ctx['seq'] = []
         ctt.cmpl(c)
 
 class sect_namespace(astnode):
@@ -97,8 +98,8 @@ class sect_namespace(astnode):
         yield self.sub('label').sub('name').sub('name'), self.sub('content')
     def cmpl(self, c):
         (lbl, ctt), = self.tidy()
-        ctx = c.swctx('prog', lbl)
-        ctt.cmpl(c)
+        ctx = c.swctx('namespace', lbl)
+        #ctt.cmpl(c)
 
 class label_prog(astnode):
     DESC = lambda s,o,m,k,t: s(
