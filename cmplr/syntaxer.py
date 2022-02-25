@@ -344,12 +344,15 @@ class astnode:
     def sub(self, ndkey):
         if not ndkey in self.nodes:
             return None
-        return self.nodes[ndkey]
+        nd = self.nodes[ndkey]
+        if isinstance(nd, astnode) and nd.isempty:
+            return None
+        return nd
 
     def tidy(self):
         nds = self.nodes
         for k in nds:
-            yield k, nds[k]
+            yield k, self.sub(k)
 
     @classmethod
     def important(cls):
@@ -362,7 +365,7 @@ class astnode:
         print(self.name())
         pad = padding * (lv + 1)
         for *ks, nd in self.tidy():
-            k = '/'.join(ks)
+            k = '/'.join('None' if k is None else k for k in ks)
             if nd is None:
                 print(pad + f'{k}: None')
             elif isinstance(nd, list):

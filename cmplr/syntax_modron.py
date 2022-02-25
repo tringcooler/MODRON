@@ -51,10 +51,10 @@ class sects(astnode):
     )
     def tidy(self):
         nd = self
-        while not nd.isempty:
+        while nd:
             snd = nd.sub('sect')
             yield 'sect', snd
-            nd = nd.nodes['...']
+            nd = nd.sub('...')
 
 class sects_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -126,11 +126,11 @@ class prog_seq(astnode):
         ),
     )
     def tidy(self):
-        nd = self
-        while not nd.isempty:
-            snd = nd.sub('term')
-            yield 'term', snd
-            nd = nd.nodes['...']
+        yield 'term', self.sub('term')
+        nd = self.sub('...')
+        while nd:
+            yield 'term', nd.sub('merge'), nd.sub('term')
+            nd = nd.sub('...')
 
 class prog_seq_tail_1(astnode):
     DESC = lambda s,o,m,k,t: m(o(
@@ -217,10 +217,10 @@ class nsref_seq(astnode):
     )
     def tidy(self):
         nd = self
-        while not nd.isempty:
+        while nd:
             snd = nd.sub('ref')
             yield 'ref', snd.sub('name')
-            nd = nd.nodes['...']
+            nd = nd.sub('...')
     def cmpl(self, c):
         c.new()
         c.setpath('temp', 'nsref_seq')
@@ -247,10 +247,10 @@ class condi_seq(astnode):
     )
     def tidy(self):
         nd = self
-        while not nd.isempty:
+        while nd:
             snd = nd.sub('pair')
             yield 'pair', snd
-            nd = nd.nodes['...']
+            nd = nd.sub('...')
 
 class condi_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -277,10 +277,10 @@ class op_seq(astnode):
     )
     def tidy(self):
         nd = self
-        while not nd.isempty:
+        while nd:
             snd = nd.sub('pair')
             yield 'pair', snd
-            nd = nd.nodes['...']
+            nd = nd.sub('...')
 
 class op_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -330,10 +330,10 @@ class namespace(astnode):
     )
     def tidy(self):
         nd = self
-        while not nd.isempty:
+        while nd:
             snd = nd.sub('declare')
             yield 'declare', snd
-            nd = nd.nodes['...']
+            nd = nd.sub('...')
 
 class namespace_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -363,11 +363,11 @@ class cexp_lv1(astnode):
         k('...', cexp_lv1_tail),
     )
     def tidy(self):
-        nd = self
-        while not nd.isempty:
-            snd = nd.sub('expr')
-            yield 'expr', snd
-            nd = nd.nodes['...']
+        yield 'expr', self.sub('expr')
+        nd = self.sub('...')
+        while nd:
+            yield 'expr', nd.sub('op'), nd.sub('expr')
+            nd = nd.sub('...')
 
 class cexp_lv1_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -384,11 +384,11 @@ class cexp_lv2(astnode):
         k('...', cexp_lv2_tail),
     )
     def tidy(self):
-        nd = self
-        while not nd.isempty:
-            snd = nd.sub('expr')
-            yield 'expr', snd
-            nd = nd.nodes['...']
+        yield 'expr', self.sub('expr')
+        nd = self.sub('...')
+        while nd:
+            yield 'expr', nd.sub('op'), nd.sub('expr')
+            nd = nd.sub('...')
 
 class cexp_lv2_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
