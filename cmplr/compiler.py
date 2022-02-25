@@ -38,7 +38,6 @@ class c_compiler:
             k = arch_guide
         if k:
             self.archpool[k] = ctx
-        return ctx
 
     def get(self, key):
         if not key in self.archpool:
@@ -52,8 +51,17 @@ class c_compiler:
     def setpath(self, *path):
         self.ctx['path'] = self._spath(path)
 
-    def archpath(self):
-        self.arch(lambda ctx: ctx['path'])
+    def archpath(self, cb_arch = None):
+        def ag(ctx):
+            sp = ctx['path']
+            if callable(cb_arch):
+                ctx = cb_arch(ctx)
+            elif cb_arch:
+                ctx = cb_arch
+            else:
+                del ctx['path']
+            return sp, ctx
+        self.arch(ag)
 
     def getpath(self, *path):
         return self.get(self._spath(path))

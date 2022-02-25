@@ -88,10 +88,8 @@ class sect_prog(astnode):
         c.setpath('prog', lbl)
         c.ctx['seq'] = []
         if nsreq:
-            c.new()
-            c.ctx['seq'] = []
             c.c(nsreq)
-            nr_seq = c.arch()['seq']
+            nr_seq = c.getpath('temp', 'nsref_seq')
             c.ctx['nsreq'] = nr_seq
         c.c(ctt)
         c.archpath()
@@ -248,8 +246,12 @@ class nsref_seq(astnode):
             yield 'ref', snd.sub('name')
             nd = nd.nodes['...']
     def cmpl(self, c):
+        c.new()
+        c.setpath('temp', 'nsref_seq')
+        seq = []
         for _, nr in self.tidy():
-            c.ctx['seq'].append(nr)
+            seq.append(nr)
+        c.archpath(seq)
 
 class nsref_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
