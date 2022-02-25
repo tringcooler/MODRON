@@ -261,6 +261,10 @@ class astnode:
         return cls._nddesc
 
     @classmethod
+    def name(cls):
+        return cls.__name__
+
+    @classmethod
     def _parsendr(cls, node, ndr):
         if not isinstance(ndr, c_ndresult):
             return ndr
@@ -294,14 +298,14 @@ class astnode:
             ctx['ast_stack'] = []
         if push:
             ctx['ast_stack'].append((
-                cls.__name__, strm.pos(), cls.important()))
+                cls.name(), strm.pos(), cls.important()))
         else:
             ctx['ast_stack'].pop()
 
     @classmethod
     def rec_unmatch(cls, strm, ctx):
         ndd = cls.nddesc()
-        ndd.rec_unmatch(strm, ctx, cls.__name__)
+        ndd.rec_unmatch(strm, ctx, cls.name())
 
     @classmethod
     def rec_match(cls, strm, ctx):
@@ -355,7 +359,7 @@ class astnode:
         if self.isempty:
             print('empty')
             return
-        print(self.__class__.__name__)
+        print(self.name())
         pad = padding * (lv + 1)
         for *ks, nd in self.tidy():
             k = '/'.join(ks)

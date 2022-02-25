@@ -76,7 +76,7 @@ class c_compiler:
         try:
             nd.cmpl(self)
         except err_compile as e:
-            raise e.set('nd', nd.__name__).setpos(nd.meta['pos'])
+            raise e.set('nd', nd.name()).setpos(nd.meta['pos'])
         except:
             raise
 
