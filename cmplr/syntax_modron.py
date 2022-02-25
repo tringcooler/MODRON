@@ -84,9 +84,17 @@ class sect_prog(astnode):
         yield self.sub('label').sub('name').sub('name'), self.sub('content')
     def cmpl(self, c):
         (_, nsreq), (lbl, ctt) = self.tidy()
-        c.goto('prog', lbl)
+        c.new()
+        c.setpath('prog', lbl)
         c.ctx['seq'] = []
-        ctt.cmpl(c)
+        if nsreq:
+            c.new()
+            c.ctx['seq'] = []
+            c.c(nsreq)
+            nr_seq = c.arch()['seq']
+            c.ctx['nsreq'] = nr_seq
+        c.c(ctt)
+        c.archpath()
 
 class sect_namespace(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -98,8 +106,10 @@ class sect_namespace(astnode):
         yield self.sub('label').sub('name').sub('name'), self.sub('content')
     def cmpl(self, c):
         (lbl, ctt), = self.tidy()
-        ctx = c.swctx('namespace', lbl)
+        c.new()
+        c.setpath('namespace', lbl)
         #ctt.cmpl(c)
+        c.archpath()
 
 class label_prog(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -237,6 +247,9 @@ class nsref_seq(astnode):
             snd = nd.sub('ref')
             yield 'ref', snd.sub('name')
             nd = nd.nodes['...']
+    def cmpl(self, c):
+        for _, nr in self.tidy():
+            c.ctx['seq'].append(nr)
 
 class nsref_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(

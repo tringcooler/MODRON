@@ -10,36 +10,70 @@ class c_compiler:
 
     def __init__(self, astroot):
         self.astroot = astroot
-        self.curpath = 'root'
-        self.ctxpool = {}
-        self.pathstack = []
+        self.ctxstack = [{}]
+        self.archpool = {}
 
-    def rerr(self, nd, msg):
-        raise err_compile(msg).setpos(nd.meta['pos'])
+    def rerr(self, msg):
+        raise err_compile(msg)
 
     @property
     def ctx(self):
-        spath = self.curpath 
-        if not spath in self.ctxpool:
-            self.ctxpool[spath] = {}
-        return self.ctxpool[self.curpath]
+        return self.ctxstack[-1]
+
+    def new(self):
+        self.ctxstack.append({})
+
+    def arch(self, arch_guide = None):
+        if len(self.ctxstack) < 1:
+            raise err_compile('unbalance compile stack')
+        ctx = self.ctxstack.pop()
+        k = None
+        if callable(arch_guide):
+            r = arch_guide(ctx)
+            try:
+                k, ctx = r
+            except:
+                k = r
+        elif arch_guide:
+            k = arch_guide
+        if k:
+            self.archpool[k] = ctx
+        return ctx
+
+    def get(self, key):
+        if not key in self.archpool:
+            return None
+        return self.archpool[key]
 
     @staticmethod
     def _spath(path):
         return '/'.join(path)
 
-    def goto(self, *path):
-        self.curpath = self._spath(path)
+    def setpath(self, *path):
+        self.ctx['path'] = self._spath(path)
 
-    def push(self):
-        self.pathstack.append(self.curpath)
+    def archpath(self):
+        self.arch(lambda ctx: ctx['path'])
 
-    def pop(self):
-        spath = self.pathstack.pop()
-        self.curpath = spath
+    def getpath(self, *path):
+        return self.get(self._spath(path))
+
+    def c(self, nd):
+        if not hasattr(nd, 'tidy') or nd.isempty:
+            return
+        elif not hasattr(nd, 'cmpl'):
+            for *_, sub in nd.tidy():
+                self.c(sub)
+            return
+        try:
+            nd.cmpl(self)
+        except err_compile as e:
+            raise e.set('nd', nd.__name__).setpos(nd.meta['pos'])
+        except:
+            raise
 
     def compile(self):
-        self.astroot.cmpl(self)
+        self.c(self.astroot)
 
 if __name__ == '__main__':
     pass

@@ -347,13 +347,6 @@ class astnode:
         for k in nds:
             yield k, nds[k]
 
-    def cmpl(self, c):
-        if self.isempty:
-            return
-        for *_, sub in self.tidy():
-            if isinstance(sub, astnode):
-                sub.cmpl(c)
-
     @classmethod
     def important(cls):
         return not cls.tidy is astnode.tidy
