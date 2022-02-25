@@ -226,6 +226,9 @@ class condi_pair(astnode):
         )),
         k('value', signed_integer),
     )
+    @classmethod
+    def important(cls):
+        return True
 
 class op_seq(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -253,6 +256,9 @@ class op_pair(astnode):
         )),
         k('value', signed_integer),
     )
+    @classmethod
+    def important(cls):
+        return True
 
 class unsigned_integer(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -302,6 +308,9 @@ class declare(astnode):
         t(KS_DCL),
         k('limit', calcexpr),
     )
+    @classmethod
+    def important(cls):
+        return True
 
 class calcexpr(astnode):
     DESC = lambda s,o,m,k,t: s(
