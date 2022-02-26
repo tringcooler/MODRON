@@ -540,7 +540,7 @@ class c_expr_ctx:
 
     @property
     def negval(self):
-        return nophs[self.op](self.termval)
+        return self.nophs[self.op](self.termval)
 
     @property
     def tval(self):
@@ -560,7 +560,7 @@ class c_expr_ctx:
             tval = term.negval
         else:
             tval = term.termval
-        dval = ophs[self.op](self.termval, tval)
+        dval = self.ophs[self.op](self.termval, tval)
         self.termval = dval
 
     def addterm(self, term):
@@ -573,7 +573,7 @@ class c_expr_ctx:
         if not self.argspace:
             return self.tval
         rterm = type(self)(self.op, self.neg)
-        op = ophs[self.op]
+        op = self.ophs[self.op]
         for term in self.termseq:
             while isinstance(term, str):
                 if term in rargs:
@@ -591,6 +591,23 @@ class c_expr_ctx:
             return rterm.tval
         else:
             return rterm
+
+    def __str__(self):
+        rs = []
+        for term in self.termseq:
+            rs.append(f'({str(term)})')
+        rs.append(str(self.termval))
+        r = (' ' + self.op + ' ').join(rs)
+        if self.neg:
+            r = '(' + r + ')'
+            if self.op == KS_EXP_ADD:
+                r = '(-' + r + ')'
+            else:
+                r = '(1/' + r + ')'
+        return r
+
+    def __repr__(self):
+        return f'<{str(self)}>'
 
 if __name__ == '__main__':
 
