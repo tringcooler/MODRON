@@ -539,6 +539,34 @@ class c_expr_ctx:
             self.termval = term
 
     @property
+    def ispure(self):
+        la = len(self.termseq)
+        if la > 1:
+            return False
+        elif la < 1:
+            return True
+        return self.termval == self.opuvs[self.op]
+
+    @property
+    def rdcval(self):
+        la = len(self.termseq)
+        if la > 1:
+            return self
+        elif la < 1:
+            return self
+        elif not self.termval == self.opuvs[self.op]:
+            return self
+        term = self.termseq[0]
+        if isinstance(term, str):
+            return self
+        if self.neg:
+            if not self.op == term.op:
+                return self
+            term = term.clone(True)
+        #print('pure', self, '->', term.rdcval)
+        return term.rdcval
+
+    @property
     def negval(self):
         return self.nophs[self.op](self.termval)
 
@@ -552,10 +580,13 @@ class c_expr_ctx:
 
     def extendterm(self, term):
         neg = (term.neg != self.neg)
-        for term in self.termseq:
+        for d in term.termseq:
+            if isinstance(d, str):
+                self.termseq.append(d)
+                continue
             if neg:
-                term = term.clone(True)
-            self.pushterm(term)
+                d = d.clone(True)
+            self.pushterm(d)
         if neg:
             tval = term.negval
         else:
@@ -564,6 +595,7 @@ class c_expr_ctx:
         self.termval = dval
 
     def addterm(self, term):
+        term = term.rdcval
         if self.op == term.op:
             self.extendterm(term)
         else:
