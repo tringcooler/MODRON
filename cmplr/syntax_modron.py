@@ -548,7 +548,7 @@ class c_expr_ctx:
         return self.termval == self.opuvs[self.op]
 
     @property
-    def rdcval(self):
+    def rdcterm(self):
         la = len(self.termseq)
         if la > 1:
             return self
@@ -563,8 +563,12 @@ class c_expr_ctx:
             if not self.op == term.op:
                 return self
             term = term.clone(True)
-        #print('pure', self, '->', term.rdcval)
-        return term.rdcval
+        #print('pure', self, '->', term.rdcterm)
+        return term.rdcterm
+
+    @property
+    def oprterm(self):
+        pass
 
     @property
     def negval(self):
@@ -595,7 +599,7 @@ class c_expr_ctx:
         self.termval = dval
 
     def addterm(self, term):
-        term = term.rdcval
+        term = term.rdcterm
         if self.op == term.op:
             self.extendterm(term)
         else:
