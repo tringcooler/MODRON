@@ -90,7 +90,7 @@ class sect(astnode):
         c.ctx['seq'] = []
         if nsreq:
             c.c(nsreq)
-            nr_seq = c.getpath('ret')
+            nr_seq = c.ret()
             c.ctx['nsreq'] = nr_seq
         c.c(ctt)
         c.archpath()
@@ -227,11 +227,10 @@ class nsref_seq(astnode):
             nd = nd.sub('...')
     def cmpl(self, c):
         c.new()
-        c.setpath('ret')
         seq = []
         for _, nr in self.tidy():
             seq.append(nr)
-        c.archpath(seq)
+        c.archret(seq)
 
 class nsref_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -308,12 +307,22 @@ class unsigned_integer(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('value', t(None, 'digit')),
     )
+    def cmpl(self, c):
+        c.new()
+        c.archret(int(self.sub('value')))
 
 class signed_integer(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('neg', m(t(KS_NEG))),
         k('value', unsigned_integer),
     )
+    def cmpl(self, c):
+        c.new()
+        c.c(self.sub('value'))
+        val = c.ret()
+        if self.sub('neg'):
+            val = - val
+        c.archret(val)
 
 class regref_wr(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -325,6 +334,9 @@ class regref_rd(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('alloc', t(None, 'word')),
     )
+    def cmpl(self, c):
+        c.new()
+        c.archret(self.sub('alloc'))
 
 class namespace(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -352,9 +364,15 @@ class declare(astnode):
         t(KS_DCL),
         k('limit', calcexpr),
     )
-    @classmethod
-    def important(cls):
-        return True
+    def tidy(self):
+        yield self.sub('name'), self.sub('limit')
+    def cmpl(self, c):
+        c.new()
+        (name, limit), = self.tidy()
+        c.setpath('dec', name)
+        c.c(limit)
+        ec = c.ret()
+        c.archpath(ec)
 
 class calcexpr(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -372,6 +390,21 @@ class cexp_lv1(astnode):
         while nd:
             yield 'expr', nd.sub('op'), nd.sub('expr')
             nd = nd.sub('...')
+    def cmpl(self, c):
+        c.new()
+        ec = c_expr_ctx(KS_EXP_ADD, False)
+        itr = self.tidy()
+        _, sub = next(itr)
+        c.c(sub)
+        term = c.ret()
+        ec.addterm(term)
+        for _, op, sub in itr:
+            c.c(sub)
+            term = c.ret()
+            if op == KS_EXP_SUB:
+                term = term.clone(True)
+            ec.addterm(term)
+        c.archret(ec)
 
 class cexp_lv1_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -393,6 +426,21 @@ class cexp_lv2(astnode):
         while nd:
             yield 'expr', nd.sub('op'), nd.sub('expr')
             nd = nd.sub('...')
+    def cmpl(self, c):
+        c.new()
+        ec = c_expr_ctx(KS_EXP_MUL, False)
+        itr = self.tidy()
+        _, sub = next(itr)
+        c.c(sub)
+        term = c.ret()
+        ec.addterm(term)
+        for _, op, sub in itr:
+            c.c(sub)
+            term = c.ret()
+            if op == KS_EXP_DIV:
+                term = term.clone(True)
+            ec.addterm(term)
+        c.archret(ec)
 
 class cexp_lv2_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -410,6 +458,17 @@ class cexp_uop(astnode):
         ))),
         k('expr', cexp_term),
     )
+    def cmpl(self, c):
+        if not self.sub('op'):
+            c.c(self.sub('expr'))
+            return
+        c.new()
+        ec = c_expr_ctx(KS_EXP_ADD, False)
+        c.c(self.sub('expr'))
+        term = c.ret()
+        term = term.clone(True)
+        ec.addterm(term)
+        c.archret(ec)
 
 class cexp_term(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -417,6 +476,16 @@ class cexp_term(astnode):
         k('term', regref_rd),
         k('term', unsigned_integer),
     )
+    def cmpl(self, c):
+        if self.sub('expr'):
+            c.c(self.sub('expr'))
+            return
+        c.new()
+        ec = c_expr_ctx(KS_EXP_ADD, False)
+        c.c(self.sub('term'))
+        val = c.ret()
+        ec.initterm(val)
+        c.archret(ec)
 
 class cexp_br(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -431,23 +500,97 @@ class cexp_br(astnode):
 
 class c_expr_ctx:
 
-    def __init__(self, term):
-        val = self.getval(term)
-        argsp = []
-        if isinstance(val, str):
-            argsp.append(val)
-        self.value = val
-        self.argspace = argsp
+    ophs = {
+        KS_EXP_ADD: lambda a, b: a+b,
+        KS_EXP_MUL: lambda a, b: a*b,
+    }
+    nophs = {
+        KS_EXP_ADD: lambda a: -a,
+        KS_EXP_MUL: lambda a: 1/a,
+    }
+    opuvs = {
+        KS_EXP_ADD: 0,
+        KS_EXP_MUL: 1,
+    }
 
-    @staticmethod
-    def getval(term):
-        if isinstance(term, c_expr_ctx) and not term.argspace:
-            return term.value
+    def __init__(self, op, neg):
+        self.op = op
+        self.neg = neg
+        self.argspace = set()
+        self.termseq = []
+        self.termval = self.opuvs[op]
+
+    def clone(self, neg = False):
+        d = type(self)(self.op, self.neg, self.termval)
+        d.argspace = self.argspace.copy()
+        d.termseq = self.termseq.copy()
+        d.termval = self.termval
+        if neg:
+            d.neg = not d.neg
+        return d
+
+    def initterm(self, term):
+        if isinstance(term, c_expr_ctx):
+            raise TypeError('init term should be a value')
+        if isinstance(term, str):
+            self.termseq.append(term)
+            self.argspace.add(term)
         else:
-            return term
+            self.termval = term
 
-    def resolve(self, op, term):
-        pass
+    @property
+    def negval(self):
+        return nophs[self.op](self.termval)
+
+    @property
+    def tval(self):
+        return self.negval if self.neg else self.termval
+
+    def pushterm(self, term):
+        self.argspace.update(term.argspace)
+        self.termseq.append(term)
+
+    def extendterm(self, term):
+        neg = (term.neg != self.neg)
+        for term in self.termseq:
+            if neg:
+                term = term.clone(True)
+            self.pushterm(term)
+        if neg:
+            tval = term.negval
+        else:
+            tval = term.termval
+        dval = ophs[self.op](self.termval, tval)
+        self.termval = dval
+
+    def addterm(self, term):
+        if self.op == term.op:
+            self.extendterm(term)
+        else:
+            self.pushterm(term)
+
+    def resolve(self, rargs = {}):
+        if not self.argspace:
+            return self.tval
+        rterm = type(self)(self.op, self.neg)
+        op = ophs[self.op]
+        for term in self.termseq:
+            while isinstance(term, str):
+                if term in rargs:
+                    term = rargs[term]
+                else:
+                    break
+            if isinstance(term, c_expr_ctx):
+                term = term.resolve(rargs)
+            if not isinstance(term, c_expr_ctx):
+                d = type(self)(self.op, self.neg)
+                d.initterm(term)
+                term = d
+            rterm.addterm(term)
+        if not rterm.argspace:
+            return rterm.tval
+        else:
+            return rterm
 
 if __name__ == '__main__':
 

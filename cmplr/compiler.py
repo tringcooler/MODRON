@@ -66,6 +66,21 @@ class c_compiler:
     def getpath(self, *path):
         return self.get(self._spath(path))
 
+    def archret(self, ret = None):
+        def ag(ctx):
+            if ret is None:
+                d = ctx
+            else:
+                d = ret
+            return 'ret', ret
+        self.arch(ag)
+
+    def ret(self):
+        ret = self.get('ret')
+        if 'ret' in self.archpool:
+            del self.archpool['ret']
+        return ret
+
     def c(self, nd):
         if not hasattr(nd, 'tidy') or nd.isempty:
             return
