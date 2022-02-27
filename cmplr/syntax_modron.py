@@ -627,7 +627,9 @@ class c_expr_ctx:
                 continue
             if neg:
                 d = d.negterm(self.op)
-            self.pushterm(d)
+            if d.op == self.op:
+                print('here', self, '|', d, d.termseq)
+            self.addterm(d)
         if neg:
             tval = term.negval
         else:
@@ -681,7 +683,8 @@ class c_expr_ctx:
             rs.append(str(self.termval))
         r = (' ' + self.op + ' ').join(rs)
         if self.neg:
-            r = '( ' + r + ' )'
+            if len(rs) > 1:
+                r = '( ' + r + ' )'
             if self.op == KS_EXP_ADD:
                 r = '-' + r
             else:
@@ -704,7 +707,8 @@ if __name__ == '__main__':
         cmpl = c_compiler(rt)
         cmpl.compile()
     def test2():
-        raw = ' a + -(b*(c/-(d+e)+f)/g)'
+        #raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
+        raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
         global psr, cmpl, rt, expr
         psr = c_parser(calcexpr, raw)
         rt = psr.parse()
