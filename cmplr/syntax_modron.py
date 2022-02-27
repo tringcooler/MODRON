@@ -624,6 +624,7 @@ class c_expr_ctx:
                     self.pushterm(dt)
                 else:
                     self.termseq.append(d)
+                    self.argspace.add(d)
                 continue
             if neg:
                 d = d.negterm(self.op)
@@ -671,6 +672,7 @@ class c_expr_ctx:
                 d.initterm(term)
                 term = d
             rterm.addterm(term)
+        #print('rslv', self, '|', rterm)
         if not rterm.argspace:
             return rterm.tval
         else:
@@ -711,14 +713,15 @@ if __name__ == '__main__':
         cmpl = c_compiler(rt)
         cmpl.compile()
     def test2():
-        #raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
+        raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
         #raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
         #raw = 'a - 1/b'
-        raw = '-(a - 1/b)'
+        #raw = '-(a - 1/b)'
         global psr, cmpl, rt, expr
         psr = c_parser(calcexpr, raw)
         rt = psr.parse()
         cmpl = c_compiler(rt)
         cmpl.compile()
         expr = cmpl.ret()
-    test2()
+        return expr.negterm().resolve()
+    rexpr = test2()
