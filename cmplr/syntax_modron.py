@@ -404,7 +404,7 @@ class cexp_lv1(astnode):
             if op == KS_EXP_SUB:
                 term = term.clone(True)
             ec.addterm(term)
-        c.archret(ec)
+        c.archret(ec.rdcterm)
 
 class cexp_lv1_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -440,7 +440,7 @@ class cexp_lv2(astnode):
             if op == KS_EXP_DIV:
                 term = term.clone(True)
             ec.addterm(term)
-        c.archret(ec)
+        c.archret(ec.rdcterm)
 
 class cexp_lv2_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
@@ -468,7 +468,7 @@ class cexp_uop(astnode):
         term = c.ret()
         term = term.clone(True)
         ec.addterm(term)
-        c.archret(ec)
+        c.archret(ec.rdcterm)
 
 class cexp_term(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -586,6 +586,7 @@ class c_expr_ctx:
             return None
         term = type(self)(self.othop, False)
         term.initterm(pval)
+        #print('othop', self, '->', term)
         return term
 
     @property
