@@ -627,9 +627,10 @@ class c_expr_ctx:
                 continue
             if neg:
                 d = d.negterm(self.op)
-            if d.op == self.op:
-                print('here', self, '|', d, d.termseq)
-            self.addterm(d)
+            if d.op == self.op and not d.neg:
+                self.extendterm(d)
+            else:
+                self.pushterm(d)
         if neg:
             tval = term.negval
         else:
@@ -707,8 +708,10 @@ if __name__ == '__main__':
         cmpl = c_compiler(rt)
         cmpl.compile()
     def test2():
-        #raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
-        raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
+        raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
+        #raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
+        #raw = 'a - 1/b'
+        #raw = '-(a - 1/b)'
         global psr, cmpl, rt, expr
         psr = c_parser(calcexpr, raw)
         rt = psr.parse()
