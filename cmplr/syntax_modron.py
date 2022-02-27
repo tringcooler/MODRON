@@ -543,6 +543,10 @@ class c_expr_ctx:
         return ops[(si + 1) % len(ops)]
 
     @property
+    def noval(self):
+        return self.termval == self.opuvs[self.op]
+
+    @property
     def pure(self):
         la = len(self.termseq)
         if la > 1:
@@ -554,7 +558,7 @@ class c_expr_ctx:
                 return self.termval
         elif self.neg:
             return None
-        elif not self.termval == self.opuvs[self.op]:
+        elif not self.noval:
             return None
         term = self.termseq[0]
         if isinstance(term, str):
@@ -567,7 +571,7 @@ class c_expr_ctx:
         la = len(self.termseq)
         if not la == 1:
             return self
-        elif not self.termval == self.opuvs[self.op]:
+        elif not self.noval:
             return self
         term = self.termseq[0]
         if isinstance(term, str):
@@ -669,15 +673,19 @@ class c_expr_ctx:
     def __str__(self):
         rs = []
         for term in self.termseq:
-            rs.append(f'({str(term)})')
-        rs.append(str(self.termval))
+            if isinstance(term, str):
+                rs.append(term)
+            else:
+                rs.append(f'({str(term)})')
+        if not self.noval:
+            rs.append(str(self.termval))
         r = (' ' + self.op + ' ').join(rs)
         if self.neg:
             r = '( ' + r + ' )'
             if self.op == KS_EXP_ADD:
-                r = '(-' + r + ')'
+                r = '-' + r
             else:
-                r = '(1/' + r + ')'
+                r = '1/' + r
         return r
 
     def __repr__(self):
