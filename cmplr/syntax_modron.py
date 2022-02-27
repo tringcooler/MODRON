@@ -521,7 +521,7 @@ class c_expr_ctx:
         self.termval = self.opuvs[op]
 
     def clone(self, neg = False):
-        d = type(self)(self.op, self.neg, self.termval)
+        d = type(self)(self.op, self.neg)
         d.argspace = self.argspace.copy()
         d.termseq = self.termseq.copy()
         d.termval = self.termval
@@ -539,20 +539,35 @@ class c_expr_ctx:
             self.termval = term
 
     @property
-    def ispure(self):
+    def othop(self):
+        ops = [*self.ophs.keys()]
+        si = ops.index(self.op)
+        return ops[(si + 1) % len(ops)]
+
+    @property
+    def pure(self):
         la = len(self.termseq)
         if la > 1:
-            return False
+            return None
         elif la < 1:
-            return True
-        return self.termval == self.opuvs[self.op]
+            if self.neg:
+                return self.negval
+            else:
+                return self.termval
+        elif self.neg:
+            return None
+        elif not self.termval == self.opuvs[self.op]:
+            return None
+        term = self.termseq[0]
+        if isinstance(term, str):
+            return term
+        else:
+            return None
 
     @property
     def rdcterm(self):
         la = len(self.termseq)
-        if la > 1:
-            return self
-        elif la < 1:
+        if not la == 1:
             return self
         elif not self.termval == self.opuvs[self.op]:
             return self
@@ -560,15 +575,18 @@ class c_expr_ctx:
         if isinstance(term, str):
             return self
         if self.neg:
-            if not self.op == term.op:
-                return self
-            term = term.clone(True)
+            return self
         #print('pure', self, '->', term.rdcterm)
         return term.rdcterm
 
     @property
-    def oprterm(self):
-        pass
+    def othopterm(self):
+        pval = self.pure
+        if pval is None:
+            return None
+        term = type(self)(self.othop, False)
+        term.initterm(pval)
+        return term
 
     @property
     def negval(self):
@@ -603,7 +621,11 @@ class c_expr_ctx:
         if self.op == term.op:
             self.extendterm(term)
         else:
-            self.pushterm(term)
+            othterm = term.othopterm
+            if othterm is None:
+                self.pushterm(term)
+            else:
+                self.extendterm(othterm)
 
     def resolve(self, rargs = {}):
         if not self.argspace:
