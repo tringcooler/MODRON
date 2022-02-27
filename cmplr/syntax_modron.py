@@ -653,7 +653,7 @@ class c_expr_ctx:
     def resolve(self, rargs = {}):
         if not self.argspace:
             return self.tval
-        rterm = type(self)(self.op, self.neg)
+        rterm = type(self)(self.op, False)
         op = self.ophs[self.op]
         for term in self.termseq:
             while isinstance(term, str):
@@ -663,7 +663,10 @@ class c_expr_ctx:
                     break
             if isinstance(term, c_expr_ctx):
                 term = term.resolve(rargs)
-            if not isinstance(term, c_expr_ctx):
+            if isinstance(term, c_expr_ctx):
+                if self.neg:
+                    term = term.negterm(self.op)
+            else:
                 d = type(self)(self.op, self.neg)
                 d.initterm(term)
                 term = d
@@ -708,10 +711,10 @@ if __name__ == '__main__':
         cmpl = c_compiler(rt)
         cmpl.compile()
     def test2():
-        raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
+        #raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
         #raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
         #raw = 'a - 1/b'
-        #raw = '-(a - 1/b)'
+        raw = '-(a - 1/b)'
         global psr, cmpl, rt, expr
         psr = c_parser(calcexpr, raw)
         rt = psr.parse()
