@@ -402,7 +402,7 @@ class cexp_lv1(astnode):
             c.c(sub)
             term = c.ret()
             if op == KS_EXP_SUB:
-                term = term.clone(True)
+                term = term.negterm(KS_EXP_ADD)
             ec.addterm(term)
         c.archret(ec.rdcterm)
 
@@ -438,7 +438,7 @@ class cexp_lv2(astnode):
             c.c(sub)
             term = c.ret()
             if op == KS_EXP_DIV:
-                term = term.clone(True)
+                term = term.negterm(KS_EXP_MUL)
             ec.addterm(term)
         c.archret(ec.rdcterm)
 
@@ -463,12 +463,10 @@ class cexp_uop(astnode):
             c.c(self.sub('expr'))
             return
         c.new()
-        ec = c_expr_ctx(KS_EXP_ADD, False)
         c.c(self.sub('expr'))
         term = c.ret()
-        term = term.clone(True)
-        ec.addterm(term)
-        c.archret(ec.rdcterm)
+        term = term.negterm(KS_EXP_ADD)
+        c.archret(term.rdcterm)
 
 class cexp_term(astnode):
     DESC = lambda s,o,m,k,t: o(
@@ -506,7 +504,7 @@ class c_expr_ctx:
     }
     nophs = {
         KS_EXP_ADD: lambda a: -a,
-        KS_EXP_MUL: lambda a: 1/a,
+        KS_EXP_MUL: lambda a: 1 // a if abs(a) == 1 else 1/a,
     }
     opuvs = {
         KS_EXP_ADD: 0,
@@ -589,6 +587,17 @@ class c_expr_ctx:
         #print('othop', self, '->', term)
         return term
 
+    def negterm(self, dop = None):
+        sterm = self.rdcterm
+        if dop is None or dop == sterm.op:
+            return sterm.clone(True)
+        oterm = sterm.othopterm
+        if oterm:
+            return oterm.clone(True)
+        term = type(self)(dop, True)
+        term.pushterm(sterm)
+        return term
+
     @property
     def negval(self):
         return self.nophs[self.op](self.termval)
@@ -605,10 +614,15 @@ class c_expr_ctx:
         neg = (term.neg != self.neg)
         for d in term.termseq:
             if isinstance(d, str):
-                self.termseq.append(d)
+                if neg:
+                    dt = type(self)(self.op, True)
+                    dt.initterm(d)
+                    self.pushterm(dt)
+                else:
+                    self.termseq.append(d)
                 continue
             if neg:
-                d = d.clone(True)
+                d = d.negterm(self.op)
             self.pushterm(d)
         if neg:
             tval = term.negval
@@ -618,6 +632,7 @@ class c_expr_ctx:
         self.termval = dval
 
     def addterm(self, term):
+        #print(f'add [{self.op}]{self}  [{term.op}]{term}')
         term = term.rdcterm
         if self.op == term.op:
             self.extendterm(term)
@@ -658,7 +673,7 @@ class c_expr_ctx:
         rs.append(str(self.termval))
         r = (' ' + self.op + ' ').join(rs)
         if self.neg:
-            r = '(' + r + ')'
+            r = '( ' + r + ' )'
             if self.op == KS_EXP_ADD:
                 r = '(-' + r + ')'
             else:
@@ -680,4 +695,12 @@ if __name__ == '__main__':
         rt = psr.parse()
         cmpl = c_compiler(rt)
         cmpl.compile()
-    test1()
+    def test2():
+        raw = ' a + -(b*(c/-(d+e)+f)/g)'
+        global psr, cmpl, rt, expr
+        psr = c_parser(calcexpr, raw)
+        rt = psr.parse()
+        cmpl = c_compiler(rt)
+        cmpl.compile()
+        expr = cmpl.ret()
+    test2()
