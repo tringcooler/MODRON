@@ -12,7 +12,9 @@ KS_OPS = '/'
 KS_NEG = '-'
 KS_PRS_EQ = '='
 KS_PRS_PL = '+'
-KS_DCL = '>'
+
+KS_DCL_NEW = '>'
+KS_DCL_REF = '='
 
 KS_PRG_BR1 = '{'
 KS_PRG_BR2 = '}'
@@ -324,19 +326,24 @@ class signed_integer(astnode):
             val = - val
         c.archret(val)
 
+class regname(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', t(None, 'word')),
+    )
+
 class regref_wr(astnode):
     DESC = lambda s,o,m,k,t: o(
-        k('alloc', t(None, 'word')),
+        k('alloc', regname),
         k('direct', unsigned_integer),
     )
 
 class regref_rd(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('alloc', t(None, 'word')),
+        k('alloc', regname),
     )
     def cmpl(self, c):
         c.new()
-        c.archret(self.sub('alloc'))
+        c.archret(self.sub('alloc').sub('name'))
 
 class namespace(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -359,13 +366,19 @@ class namespace_tail(astnode):
     ))
 
 class declare(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        k('new', declare_new),
+        k('ref', declare_ref),
+    )
+
+class declare_new(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('name', t(None, 'word')),
-        t(KS_DCL),
+        k('name', regname),
+        t(KS_DCL_NEW),
         k('limit', calcexpr),
     )
     def tidy(self):
-        yield self.sub('name'), self.sub('limit')
+        yield self.sub('name').sub('name'), self.sub('limit')
     def cmpl(self, c):
         c.new()
         (name, limit), = self.tidy()
@@ -373,6 +386,22 @@ class declare(astnode):
         c.c(limit)
         ec = c.ret()
         c.archpath(ec)
+
+class declare_ref(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', regname),
+        t(KS_DCL_REF),
+        k('src', regref_rd),
+    )
+    def tidy(self):
+        yield self.sub('name').sub('name'), self.sub('src')
+    def cmpl(self, c):
+        c.new()
+        (name, src), = self.tidy()
+        c.setpath('decref', name)
+        c.c(src)
+        srcref = c.ret()
+        c.archpath(srcref)
 
 class calcexpr(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -712,6 +741,7 @@ if __name__ == '__main__':
         rt = psr.parse()
         cmpl = c_compiler(rt)
         cmpl.compile()
+    test1()
     def test2():
         raw = ' a + -(b*(c/-(d+e)+f+(b+a)-(b-c*a)*1)/g)'
         #raw = '-(a + b - 3 - c - 5 -(-(d+e - 7) - 9))'
@@ -724,4 +754,4 @@ if __name__ == '__main__':
         cmpl.compile()
         expr = cmpl.ret()
         return expr.negterm().resolve()
-    rexpr = test2()
+    #rexpr = test2()
