@@ -12,9 +12,7 @@ KS_OPS = '/'
 KS_NEG = '-'
 KS_PRS_EQ = '='
 KS_PRS_PL = '+'
-
-KS_DCL_NEW = '>'
-KS_DCL_REF = '='
+KS_DCL = '>'
 
 KS_PRG_BR1 = '{'
 KS_PRG_BR2 = '}'
@@ -23,6 +21,7 @@ KS_PRG_MRG = '+'
 KS_NSP_REQ = '@'
 KS_NSP_AL1 = '<'
 KS_NSP_AL2 = '>'
+KS_NSP_RDC = '='
 
 KS_EXP_BR1 = '('
 KS_EXP_BR2 = ')'
@@ -186,7 +185,7 @@ class prog_lv1(astnode):
 
 class prog_ref(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('name', t(None, 'word')),
+        k('name', sect_name),
     )
 
 class prog_lv2(astnode):
@@ -225,13 +224,14 @@ class nsref_seq(astnode):
         nd = self
         while nd:
             snd = nd.sub('ref')
-            yield 'ref', snd.sub('name')
+            yield 'ref', snd
             nd = nd.sub('...')
     def cmpl(self, c):
         c.new()
         seq = []
         for _, nr in self.tidy():
-            seq.append(nr)
+            c.c(nr)
+            seq.append(c.ret())
         c.archret(seq)
 
 class nsref_seq_tail(astnode):
@@ -241,9 +241,41 @@ class nsref_seq_tail(astnode):
     ))
 
 class nsref(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('name', t(None, 'word')),
+    DESC = lambda s,o,m,k,t: o(
+        k('redec', redeclare),
+        k('name', reg_name),
     )
+    def tidy(self):
+        rdc = self.sub('redec')
+        if rdc:
+            yield 'redec', rdc
+        else:
+            yield 'nsname', self.sub('name')
+    def cmpl(self, c):
+        c.new()
+        (typ, snd), = self.tidy()
+        if typ == 'nsname':
+            r = snd.sub('name')
+        else:
+            c.c(snd)
+            r = c.ret()
+        c.ctx[typ] = r
+        c.archret()
+
+class redeclare(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('name', reg_name),
+        t(KS_NSP_RDC),
+        k('src', regref_rd),
+    )
+    def tidy(self):
+        yield self.sub('name').sub('name'), self.sub('src')
+    def cmpl(self, c):
+        c.new()
+        (dname, src), = self.tidy()
+        c.c(src)
+        c.ctx[dname] = c.ret()
+        c.archret()
 
 class condi_seq(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -326,20 +358,20 @@ class signed_integer(astnode):
             val = - val
         c.archret(val)
 
-class regname(astnode):
+class reg_name(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('name', t(None, 'word')),
     )
 
 class regref_wr(astnode):
     DESC = lambda s,o,m,k,t: o(
-        k('alloc', regname),
+        k('alloc', reg_name),
         k('direct', unsigned_integer),
     )
 
 class regref_rd(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('alloc', regname),
+        k('alloc', reg_name),
     )
     def cmpl(self, c):
         c.new()
@@ -366,15 +398,9 @@ class namespace_tail(astnode):
     ))
 
 class declare(astnode):
-    DESC = lambda s,o,m,k,t: o(
-        k('new', declare_new),
-        k('ref', declare_ref),
-    )
-
-class declare_new(astnode):
     DESC = lambda s,o,m,k,t: s(
-        k('name', regname),
-        t(KS_DCL_NEW),
+        k('name', reg_name),
+        t(KS_DCL),
         k('limit', calcexpr),
     )
     def tidy(self):
@@ -386,22 +412,6 @@ class declare_new(astnode):
         c.c(limit)
         ec = c.ret()
         c.archpath(ec)
-
-class declare_ref(astnode):
-    DESC = lambda s,o,m,k,t: s(
-        k('name', regname),
-        t(KS_DCL_REF),
-        k('src', regref_rd),
-    )
-    def tidy(self):
-        yield self.sub('name').sub('name'), self.sub('src')
-    def cmpl(self, c):
-        c.new()
-        (name, src), = self.tidy()
-        c.setpath('decref', name)
-        c.c(src)
-        srcref = c.ret()
-        c.archpath(srcref)
 
 class calcexpr(astnode):
     DESC = lambda s,o,m,k,t: s(
@@ -733,6 +743,7 @@ if __name__ == '__main__':
 
     from compiler import c_compiler
     from pdb import pm
+    from pprint import pprint as ppr
     def test1():
         with open('../test2.mdr.txt', 'r') as fd:
             raw = fd.read()

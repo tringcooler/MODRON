@@ -72,7 +72,7 @@ class c_compiler:
                 d = ctx
             else:
                 d = ret
-            return 'ret', ret
+            return 'ret', d
         self.arch(ag)
 
     def ret(self):
