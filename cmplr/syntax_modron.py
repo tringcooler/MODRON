@@ -211,8 +211,39 @@ class prog_stmt(astnode):
 class namespace_alloc(astnode):
     DESC = lambda s,o,m,k,t: s(
         t(KS_NSP_AL1),
-        k('seq', nsref_seq),
+        k('seq', nsalloc_seq),
         t(KS_NSP_AL2),
+    )
+
+class nsalloc_seq(astnode):
+    DESC = lambda s,o,m,k,t: s(
+        k('ns', nsalloc),
+        k('...', nsalloc_seq_tail),
+    )
+    def tidy(self):
+        nd = self
+        while nd:
+            snd = nd.sub('ns')
+            yield 'ns', snd
+            nd = nd.sub('...')
+    def cmpl(self, c):
+        c.new()
+        seq = []
+        for _, nr in self.tidy():
+            c.c(nr)
+            seq.append(c.ret())
+        c.archret(seq)
+
+class nsalloc_seq_tail(astnode):
+    DESC = lambda s,o,m,k,t: m(s(
+        k('ns', nsalloc),
+        k('...', nsalloc_seq_tail),
+    ))
+
+class nsalloc(astnode):
+    DESC = lambda s,o,m,k,t: o(
+        k('redec', redeclare),
+        k('ref', nsref),
     )
 
 class nsref_seq(astnode):
@@ -241,25 +272,15 @@ class nsref_seq_tail(astnode):
     ))
 
 class nsref(astnode):
-    DESC = lambda s,o,m,k,t: o(
-        k('redec', redeclare),
+    DESC = lambda s,o,m,k,t: s(
         k('name', reg_name),
     )
     def tidy(self):
-        rdc = self.sub('redec')
-        if rdc:
-            yield 'redec', rdc
-        else:
-            yield 'nsname', self.sub('name')
+        yield 'nsname', self.sub('name')
     def cmpl(self, c):
         c.new()
         (typ, snd), = self.tidy()
-        if typ == 'nsname':
-            r = snd.sub('name')
-        else:
-            c.c(snd)
-            r = c.ret()
-        c.ctx[typ] = r
+        c.ctx[typ] = snd.sub('name')
         c.archret()
 
 class redeclare(astnode):
@@ -274,7 +295,7 @@ class redeclare(astnode):
         c.new()
         (dname, src), = self.tidy()
         c.c(src)
-        c.ctx[dname] = c.ret()
+        c.ctx['redeclare'] = (dname, c.ret())
         c.archret()
 
 class condi_seq(astnode):
