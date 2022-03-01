@@ -55,7 +55,7 @@ class c_compiler:
         def ag(ctx):
             sp = ctx['path']
             if callable(cb_arch):
-                ctx = cb_arch(ctx)
+                ctx = cb_arch(ctx, self.get(sp))
             elif cb_arch:
                 ctx = cb_arch
             else:
