@@ -203,7 +203,9 @@ class prog_block(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('ns', m(namespace_alloc)),
         t(KS_PRG_BR1),
+        blankline,
         k('seq', prog_seq),
+        blankline,
         t(KS_PRG_BR2),
     )
 
@@ -217,13 +219,16 @@ class prog_stmt(astnode):
 class namespace_alloc(astnode):
     DESC = lambda s,o,m,k,t: s(
         t(KS_NSP_AL1),
+        blankline,
         k('seq', nsalloc_seq),
+        blankline,
         t(KS_NSP_AL2),
     )
 
 class nsalloc_seq(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('ns', nsalloc),
+        blankline,
         k('...', nsalloc_seq_tail),
     )
     def tidy(self):
@@ -243,6 +248,7 @@ class nsalloc_seq(astnode):
 class nsalloc_seq_tail(astnode):
     DESC = lambda s,o,m,k,t: m(s(
         k('ns', nsalloc),
+        blankline,
         k('...', nsalloc_seq_tail),
     ))
 
