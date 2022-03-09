@@ -18,13 +18,11 @@ KS_OPS = '/'
 KS_NEG = '-'
 KS_PRS_EQ = '='
 KS_PRS_PL = '+'
+KS_DCL = '>'
 
 KS_PRG_BR1 = '{'
 KS_PRG_BR2 = '}'
 KS_PRG_MRG = '+'
-
-KS_NS_DCL = '>'
-KS_NS_RDC = '='
 
 KS_NSP_REQ = '@'
 KS_NSP_AL1 = '<'
@@ -435,16 +433,14 @@ class namespace_tail(astnode):
 class declare(astnode):
     DESC = lambda s,o,m,k,t: s(
         k('name', reg_name),
-        k('op', o(
-            t(KS_NS_DCL), t(KS_NS_RDC),
-        )),
+        t(KS_DCL),
         k('limit', calcexpr),
     )
     def tidy(self):
-        yield self.sub('name').sub('name'), self.sub('op'), self.sub('limit')
+        yield self.sub('name').sub('name'), self.sub('limit')
     def cmpl(self, c):
         c.new()
-        (name, op, limit), = self.tidy()
+        (name, limit), = self.tidy()
         c.setpath('dec', name)
         c.c(limit)
         ec = c.ret()
