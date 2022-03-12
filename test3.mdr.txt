@@ -1,0 +1,29 @@
+ns_a:
+
+ar1 > 500 ar2 > ar1
+
+ns_b @ ns_a:
+
+br1 > ar1 * 2 br2 > ar2 br3 > br2
+
+if_a @ ns_a:
+
+ia1 > ar1
+
+if_b:
+ib1 > 500
+
+rt_a @ if_a : <ns_a ns_b> {
+
+ia1 = 20 | ia1 = 10
+
+{ br1 = 30 | br1 + 20
+ar2 = 30 | ar2 + 20
+br3 = 30 | br3 + 20 }
+}
+
+entry:
+
+<if_b if_a ia1 = ib1> {
+rt_a
+}
